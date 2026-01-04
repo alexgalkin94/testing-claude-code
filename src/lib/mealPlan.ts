@@ -14,6 +14,7 @@ export interface Meal {
   id: string;
   name: string;
   time: string;
+  icon: 'sunrise' | 'sun' | 'sunset' | 'cookie';
   items: MealItem[];
 }
 
@@ -34,6 +35,7 @@ export const DAY_A: DayPlan = {
       id: 'breakfast-a',
       name: 'Frühstück',
       time: 'Pre-Workout',
+      icon: 'sunrise',
       items: [
         {
           id: 'carbs-breakfast',
@@ -74,6 +76,7 @@ export const DAY_A: DayPlan = {
       id: 'lunch-a',
       name: 'Mittag',
       time: 'Post-Workout',
+      icon: 'sun',
       items: [
         {
           id: 'iglo',
@@ -99,6 +102,7 @@ export const DAY_A: DayPlan = {
       id: 'dinner-a',
       name: 'Abendessen',
       time: '~18:00',
+      icon: 'sunset',
       items: [
         {
           id: 'protein-dinner',
@@ -123,6 +127,7 @@ export const DAY_A: DayPlan = {
       id: 'snack-a',
       name: 'Snack',
       time: 'Abends',
+      icon: 'cookie',
       items: [
         {
           id: 'protein-snack',
@@ -148,6 +153,7 @@ export const DAY_B: DayPlan = {
       id: 'breakfast-b',
       name: 'Frühstück',
       time: 'Pre-Workout',
+      icon: 'sunrise',
       items: [
         {
           id: 'carbs-breakfast-b',
@@ -188,6 +194,7 @@ export const DAY_B: DayPlan = {
       id: 'lunch-b',
       name: 'Mittag',
       time: 'Post-Workout',
+      icon: 'sun',
       items: [
         {
           id: 'protein-lunch-b',
@@ -221,6 +228,7 @@ export const DAY_B: DayPlan = {
       id: 'dinner-b',
       name: 'Abendessen',
       time: '~18:00',
+      icon: 'sunset',
       items: [
         {
           id: 'protein-dinner-b',
@@ -245,6 +253,7 @@ export const DAY_B: DayPlan = {
       id: 'snack-b',
       name: 'Snack',
       time: 'Abends',
+      icon: 'cookie',
       items: [
         {
           id: 'protein-snack-b',

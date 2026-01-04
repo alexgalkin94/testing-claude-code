@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { format, subDays, addDays, isToday, isSameDay } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Check, ChevronDown, Scale, Flame, TrendingDown, ChevronRight, ChevronLeft, Calendar } from 'lucide-react';
+import { Check, ChevronDown, Scale, Flame, TrendingDown, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie } from 'lucide-react';
 import Card from '@/components/Card';
 import {
   DAY_A,
@@ -40,6 +40,16 @@ const DEFAULT_PROFILE: Profile = {
   currentWeight: 90,
   goalWeight: 82,
   startDate: '2024-12-01',
+};
+
+const MealIcon = ({ icon, className }: { icon: 'sunrise' | 'sun' | 'sunset' | 'cookie'; className?: string }) => {
+  const iconProps = { size: 16, className };
+  switch (icon) {
+    case 'sunrise': return <Sunrise {...iconProps} />;
+    case 'sun': return <Sun {...iconProps} />;
+    case 'sunset': return <Sunset {...iconProps} />;
+    case 'cookie': return <Cookie {...iconProps} />;
+  }
 };
 
 export default function TodayPage() {
@@ -450,6 +460,10 @@ export default function TodayPage() {
                   {allMealChecked && <Check size={12} strokeWidth={2.5} />}
                 </button>
 
+                <MealIcon
+                  icon={meal.icon}
+                  className={allMealChecked ? 'text-zinc-600' : 'text-zinc-400'}
+                />
                 <div className="flex-1">
                   <h3 className={`font-medium text-sm ${allMealChecked ? 'text-zinc-500 line-through' : ''}`}>
                     {meal.name}
