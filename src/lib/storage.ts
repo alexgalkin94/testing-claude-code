@@ -135,9 +135,21 @@ export function addMeasurement(entry: Measurement): void {
   setItem(KEYS.measurements, measurements);
 }
 
+// Default settings for the cutting phase
+const DEFAULT_SETTINGS: UserSettings = {
+  name: '',
+  startWeight: 0,
+  goalWeight: 0,
+  calorieTarget: 1700,
+  proteinTarget: 157,
+  tdee: 2125,
+  startDate: new Date().toISOString().split('T')[0],
+};
+
 // Settings
-export function getSettings(): UserSettings | null {
-  return getItem(KEYS.settings, null);
+export function getSettings(): UserSettings {
+  const saved = getItem<UserSettings | null>(KEYS.settings, null);
+  return saved || DEFAULT_SETTINGS;
 }
 
 export function saveSettings(settings: UserSettings): void {

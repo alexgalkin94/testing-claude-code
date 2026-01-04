@@ -116,7 +116,7 @@ export default function MealPlanPage() {
                   <Utensils size={16} className="text-[#8b5cf6]" />
                   {meal.name}
                 </h3>
-                <p className="text-xs text-gray-500">{meal.time} • {meal.totalCalories} kcal • {meal.totalProtein}g protein</p>
+                <p className="text-xs text-gray-500">{meal.time} • {meal.totalCalories} kcal • {meal.totalProtein}g Protein</p>
               </div>
               <Button
                 size="sm"
