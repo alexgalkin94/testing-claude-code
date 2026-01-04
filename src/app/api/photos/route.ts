@@ -1,20 +1,42 @@
 import { put, list, del } from '@vercel/blob';
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 
 const USER_ID = 'alex_cutboard';
 const PHOTOS_PREFIX = `${USER_ID}/photos/`;
 
-export async function GET() {
+// Simple token check - in production use proper auth
+const AUTH_TOKEN = process.env.CUTBOARD_AUTH_TOKEN || 'alex_secret_2024';
+
+function checkAuth(request: Request): boolean {
+  const authHeader = request.headers.get('x-auth-token');
+  const url = new URL(request.url);
+  const tokenParam = url.searchParams.get('token');
+
+  return authHeader === AUTH_TOKEN || tokenParam === AUTH_TOKEN;
+}
+
+export async function GET(request: Request) {
+  // Auth check for listing photos
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { blobs } = await list({ prefix: PHOTOS_PREFIX });
 
-    const photos = blobs.map(blob => ({
-      url: blob.url,
-      pathname: blob.pathname,
-      uploadedAt: blob.uploadedAt,
-      // Extract date from filename (format: YYYY-MM-DD_timestamp.jpg)
-      date: blob.pathname.split('/').pop()?.split('_')[0] || '',
-    })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const photos = blobs.map(blob => {
+      // Extract date from filename (format: YYYY-MM-DD_uuid.ext)
+      const filename = blob.pathname.split('/').pop() || '';
+      const datePart = filename.split('_')[0];
+
+      return {
+        url: blob.url,
+        pathname: blob.pathname,
+        uploadedAt: blob.uploadedAt,
+        date: datePart || '',
+      };
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return NextResponse.json(photos);
   } catch (error) {
@@ -24,6 +46,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // Auth check for uploads
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -33,13 +60,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Create filename with date and timestamp
-    const timestamp = Date.now();
+    // Use UUID for unguessable filename - privacy through obscurity
+    const uuid = randomUUID();
     const ext = file.name.split('.').pop() || 'jpg';
-    const filename = `${PHOTOS_PREFIX}${date}_${timestamp}.${ext}`;
+    const filename = `${PHOTOS_PREFIX}${date}_${uuid}.${ext}`;
 
     const blob = await put(filename, file, {
-      access: 'public',
+      access: 'public', // URL is public but unguessable
       addRandomSuffix: false,
     });
 
@@ -55,11 +82,21 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  // Auth check for deletion
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { url } = await request.json();
 
     if (!url) {
       return NextResponse.json({ error: 'No URL provided' }, { status: 400 });
+    }
+
+    // Verify URL belongs to this user
+    if (!url.includes(USER_ID)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     await del(url);
