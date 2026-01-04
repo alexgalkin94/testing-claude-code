@@ -1,194 +1,294 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { format, differenceInDays } from 'date-fns';
-import { TrendingDown, Flame, Target, Calendar, ClipboardList } from 'lucide-react';
+import { format } from 'date-fns';
+import { de } from 'date-fns/locale';
+import { Check, ChevronDown } from 'lucide-react';
 import Card from '@/components/Card';
-import ProgressRing from '@/components/ProgressRing';
 import {
-  getWeights,
-  getCaloriesForDate,
-  getSettings,
-  WeightEntry,
-} from '@/lib/storage';
-import { getDayType } from '@/lib/mealPlan';
-import Link from 'next/link';
+  DAY_A,
+  DAY_B,
+  DayPlan,
+  MealItem,
+  toggleItem,
+  isItemChecked,
+  getDayType,
+  setDayType,
+} from '@/lib/mealPlan';
 
-export default function Dashboard() {
-  const [settings, setSettings] = useState({ calorieTarget: 1700, proteinTarget: 157, startWeight: 0, goalWeight: 0, startDate: '' });
-  const [todayCalories, setTodayCalories] = useState({ calories: 0, protein: 0 });
-  const [latestWeight, setLatestWeight] = useState<WeightEntry | null>(null);
-  const [weightChange, setWeightChange] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [dayType, setDayType] = useState<'A' | 'B'>('A');
+export default function TodayPage() {
+  const [dayType, setDayTypeState] = useState<'A' | 'B'>('A');
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [mounted, setMounted] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const plan: DayPlan = dayType === 'A' ? DAY_A : DAY_B;
 
   useEffect(() => {
     setMounted(true);
-    const s = getSettings();
-    setSettings(s);
-    setDayType(getDayType());
+    const savedType = getDayType();
+    setDayTypeState(savedType);
 
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const todayCals = getCaloriesForDate(today);
-    if (todayCals) {
-      setTodayCalories({ calories: todayCals.calories, protein: todayCals.protein });
-    }
+    // Load checked items for today
+    const checked = new Set<string>();
+    plan.meals.forEach(meal => {
+      meal.items.forEach(item => {
+        if (isItemChecked(today, item.id)) {
+          checked.add(item.id);
+        }
+      });
+    });
+    setCheckedItems(checked);
+  }, [today]);
 
-    const weights = getWeights();
-    if (weights.length > 0) {
-      setLatestWeight(weights[weights.length - 1]);
-      if (s?.startWeight) {
-        setWeightChange(s.startWeight - weights[weights.length - 1].weight);
-      }
-    }
+  // Reload checked items when day type changes
+  useEffect(() => {
+    if (!mounted) return;
+    const currentPlan = dayType === 'A' ? DAY_A : DAY_B;
+    const checked = new Set<string>();
+    currentPlan.meals.forEach(meal => {
+      meal.items.forEach(item => {
+        if (isItemChecked(today, item.id)) {
+          checked.add(item.id);
+        }
+      });
+    });
+    setCheckedItems(checked);
+  }, [dayType, today, mounted]);
 
-    // Calculate streak (days with logged data)
-    let currentStreak = 0;
-    const sortedDates = weights.map(w => w.date).sort().reverse();
-    for (let i = 0; i < sortedDates.length; i++) {
-      const expectedDate = format(
-        new Date(Date.now() - i * 24 * 60 * 60 * 1000),
-        'yyyy-MM-dd'
-      );
-      if (sortedDates[i] === expectedDate) {
-        currentStreak++;
+  const handleToggle = (itemId: string) => {
+    toggleItem(today, itemId);
+    setCheckedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
       } else {
-        break;
+        next.add(itemId);
       }
-    }
-    setStreak(currentStreak);
-  }, []);
+      return next;
+    });
+  };
+
+  const handleDayChange = (type: 'A' | 'B') => {
+    setDayTypeState(type);
+    setDayType(type);
+  };
+
+  const toggleExpanded = (itemId: string) => {
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
+
+  // Calculate consumed macros
+  const consumed = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  plan.meals.forEach(meal => {
+    meal.items.forEach(item => {
+      if (checkedItems.has(item.id)) {
+        consumed.calories += item.calories;
+        consumed.protein += item.protein;
+        consumed.carbs += item.carbs;
+        consumed.fat += item.fat;
+      }
+    });
+  });
+
+  const completedCount = checkedItems.size;
+  const totalItems = plan.meals.reduce((sum, meal) => sum + meal.items.length, 0);
 
   if (!mounted) {
     return (
       <div className="p-4 animate-pulse">
-        <div className="h-8 bg-[#1a1a24] rounded w-1/2 mb-8"></div>
-        <div className="h-40 bg-[#1a1a24] rounded-2xl mb-4"></div>
-        <div className="h-24 bg-[#1a1a24] rounded-2xl"></div>
+        <div className="h-8 bg-[#1a1a24] rounded w-1/2 mb-4"></div>
+        <div className="h-12 bg-[#1a1a24] rounded-xl mb-6"></div>
+        <div className="space-y-4">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-32 bg-[#1a1a24] rounded-2xl"></div>
+          ))}
+        </div>
       </div>
     );
   }
 
-  const calorieProgress = Math.round((todayCalories.calories / settings.calorieTarget) * 100);
-  const proteinProgress = Math.round((todayCalories.protein / settings.proteinTarget) * 100);
-  const remaining = settings.calorieTarget - todayCalories.calories;
-  const proteinRemaining = settings.proteinTarget - todayCalories.protein;
-
-  const daysIn = settings.startDate
-    ? differenceInDays(new Date(), new Date(settings.startDate))
-    : 0;
-
   return (
-    <div className="p-4">
+    <div className="p-4 pb-24">
       {/* Header */}
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <p className="text-gray-400 text-sm">{format(new Date(), 'EEEE, d. MMM')}</p>
-          <h1 className="text-2xl font-bold">Cutting Phase</h1>
-        </div>
-        <Link href="/plan">
-          <div className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
-            dayType === 'A' ? 'bg-[#8b5cf6]' : 'bg-[#10b981]'
-          }`}>
-            Tag {dayType}
-          </div>
-        </Link>
+      <div className="mb-4">
+        <p className="text-gray-400 text-sm">
+          {format(new Date(), 'EEEE, d. MMMM', { locale: de })}
+        </p>
+        <h1 className="text-2xl font-bold">Heute</h1>
       </div>
 
-      {/* Main Progress Ring */}
-      <Card className="mb-4 flex flex-col items-center py-6" glow>
-        <ProgressRing progress={calorieProgress} size={160} strokeWidth={12}>
+      {/* Day Toggle */}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => handleDayChange('A')}
+          className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${
+            dayType === 'A'
+              ? 'bg-[#8b5cf6] text-white shadow-lg shadow-[#8b5cf6]/25'
+              : 'bg-[#1a1a24] text-gray-400 hover:bg-[#252532]'
+          }`}
+        >
+          Tag A - Iglo & Potato
+        </button>
+        <button
+          onClick={() => handleDayChange('B')}
+          className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${
+            dayType === 'B'
+              ? 'bg-[#8b5cf6] text-white shadow-lg shadow-[#8b5cf6]/25'
+              : 'bg-[#1a1a24] text-gray-400 hover:bg-[#252532]'
+          }`}
+        >
+          Tag B - Variety
+        </button>
+      </div>
+
+      {/* Progress Bar */}
+      <Card className="mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-sm text-gray-400">Fortschritt</span>
+          <span className="text-sm font-medium">{completedCount}/{totalItems}</span>
+        </div>
+        <div className="h-2 bg-[#1a1a24] rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-[#8b5cf6] to-[#10b981] transition-all duration-300"
+            style={{ width: `${(completedCount / totalItems) * 100}%` }}
+          />
+        </div>
+
+        {/* Macro Summary */}
+        <div className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-white/10">
           <div className="text-center">
-            <p className="text-3xl font-bold">{todayCalories.calories}</p>
-            <p className="text-xs text-gray-400">/ {settings.calorieTarget} kcal</p>
+            <p className="text-lg font-bold text-[#8b5cf6]">{consumed.calories}</p>
+            <p className="text-[10px] text-gray-400">/ {plan.totals.calories} kcal</p>
           </div>
-        </ProgressRing>
-        <div className="flex justify-around w-full mt-6 pt-4 border-t border-white/10">
           <div className="text-center">
-            <p className="text-lg font-semibold text-[#10b981]">{todayCalories.protein}g</p>
-            <p className="text-xs text-gray-400">/ {settings.proteinTarget}g Protein</p>
+            <p className="text-lg font-bold text-[#10b981]">{consumed.protein}g</p>
+            <p className="text-[10px] text-gray-400">/ {plan.totals.protein}g P</p>
           </div>
           <div className="text-center">
-            <p className={`text-lg font-semibold ${remaining >= 0 ? 'text-[#8b5cf6]' : 'text-[#ef4444]'}`}>
-              {remaining}
-            </p>
-            <p className="text-xs text-gray-400">kcal übrig</p>
+            <p className="text-lg font-bold text-[#f59e0b]">{consumed.carbs}g</p>
+            <p className="text-[10px] text-gray-400">/ {plan.totals.carbs}g K</p>
+          </div>
+          <div className="text-center">
+            <p className="text-lg font-bold text-[#ef4444]">{consumed.fat}g</p>
+            <p className="text-[10px] text-gray-400">/ {plan.totals.fat}g F</p>
           </div>
         </div>
       </Card>
 
-      {/* Today's Progress */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <Card>
-          <p className="text-xs text-gray-400 mb-1">Kalorien</p>
-          <div className="flex items-end justify-between">
-            <p className="text-xl font-bold">{calorieProgress}%</p>
-            <p className={`text-xs ${calorieProgress > 100 ? 'text-[#ef4444]' : 'text-gray-500'}`}>
-              {remaining >= 0 ? `${remaining} übrig` : `${Math.abs(remaining)} drüber`}
-            </p>
-          </div>
-          <div className="mt-2 h-2 bg-[#1a1a24] rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full ${calorieProgress > 100 ? 'bg-[#ef4444]' : 'bg-[#8b5cf6]'}`}
-              style={{ width: `${Math.min(calorieProgress, 100)}%` }}
-            />
-          </div>
-        </Card>
+      {/* Meals */}
+      <div className="space-y-4">
+        {plan.meals.map(meal => (
+          <Card key={meal.id}>
+            <div className="flex justify-between items-center mb-3">
+              <div>
+                <h3 className="font-semibold">{meal.name}</h3>
+                <p className="text-xs text-gray-400">{meal.time}</p>
+              </div>
+              <div className="text-right text-xs text-gray-400">
+                {meal.items.filter(i => checkedItems.has(i.id)).length}/{meal.items.length}
+              </div>
+            </div>
 
-        <Card>
-          <p className="text-xs text-gray-400 mb-1">Protein</p>
-          <div className="flex items-end justify-between">
-            <p className="text-xl font-bold">{proteinProgress}%</p>
-            <p className={`text-xs ${proteinProgress >= 100 ? 'text-[#10b981]' : 'text-gray-500'}`}>
-              {proteinRemaining > 0 ? `${proteinRemaining}g übrig` : 'Ziel erreicht!'}
-            </p>
+            <div className="space-y-2">
+              {meal.items.map(item => (
+                <MealItemRow
+                  key={item.id}
+                  item={item}
+                  checked={checkedItems.has(item.id)}
+                  expanded={expandedItems.has(item.id)}
+                  onToggle={() => handleToggle(item.id)}
+                  onExpand={() => toggleExpanded(item.id)}
+                />
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MealItemRow({
+  item,
+  checked,
+  expanded,
+  onToggle,
+  onExpand,
+}: {
+  item: MealItem;
+  checked: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  onExpand: () => void;
+}) {
+  const hasOptions = item.options && item.options.length > 0;
+
+  return (
+    <div className={`rounded-lg transition-all ${checked ? 'bg-[#10b981]/10' : 'bg-[#1a1a24]'}`}>
+      <div className="flex items-center gap-3 p-3">
+        {/* Checkbox */}
+        <button
+          onClick={onToggle}
+          className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
+            checked
+              ? 'bg-[#10b981] text-white'
+              : 'bg-[#252532] border border-white/10'
+          }`}
+        >
+          {checked && <Check size={14} strokeWidth={3} />}
+        </button>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`text-sm font-medium ${checked ? 'text-gray-400 line-through' : ''}`}>
+              {item.name}
+            </span>
+            {hasOptions && (
+              <button
+                onClick={onExpand}
+                className="text-gray-500 hover:text-gray-300"
+              >
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
+                />
+              </button>
+            )}
           </div>
-          <div className="mt-2 h-2 bg-[#1a1a24] rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full ${proteinProgress >= 100 ? 'bg-[#10b981]' : 'bg-[#f59e0b]'}`}
-              style={{ width: `${Math.min(proteinProgress, 100)}%` }}
-            />
+
+          {/* Macros */}
+          <div className="flex gap-3 mt-1 text-[10px]">
+            <span className="text-[#8b5cf6]">{item.calories} kcal</span>
+            <span className="text-[#10b981]">{item.protein}g P</span>
+            <span className="text-[#f59e0b]">{item.carbs}g K</span>
+            <span className="text-[#ef4444]">{item.fat}g F</span>
           </div>
-        </Card>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        {latestWeight && (
-          <Card className="text-center">
-            <TrendingDown className="mx-auto mb-1 text-[#10b981]" size={18} />
-            <p className="text-lg font-bold">{latestWeight.weight}</p>
-            <p className="text-[10px] text-gray-400">kg aktuell</p>
-          </Card>
-        )}
-        <Card className="text-center">
-          <Flame className="mx-auto mb-1 text-[#f59e0b]" size={18} />
-          <p className="text-lg font-bold">{streak}</p>
-          <p className="text-[10px] text-gray-400">Tage Streak</p>
-        </Card>
-        <Card className="text-center">
-          <Calendar className="mx-auto mb-1 text-[#8b5cf6]" size={18} />
-          <p className="text-lg font-bold">{Math.max(0, daysIn)}</p>
-          <p className="text-[10px] text-gray-400">Tag der Cut</p>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 gap-3">
-        <Link href="/plan">
-          <Card className="text-center py-4 hover:bg-[#1a1a24]">
-            <ClipboardList className="mx-auto mb-2 text-[#8b5cf6]" size={24} />
-            <p className="text-sm font-medium">Mahlzeit loggen</p>
-          </Card>
-        </Link>
-        <Link href="/weight">
-          <Card className="text-center py-4 hover:bg-[#1a1a24]">
-            <TrendingDown className="mx-auto mb-2 text-[#10b981]" size={24} />
-            <p className="text-sm font-medium">Gewicht loggen</p>
-          </Card>
-        </Link>
-      </div>
+      {/* Options dropdown */}
+      {hasOptions && expanded && (
+        <div className="px-3 pb-3 pt-0">
+          <div className="pl-9 space-y-1">
+            {item.options!.map((option, i) => (
+              <div key={i} className="text-xs text-gray-400 py-1">
+                • {option}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
