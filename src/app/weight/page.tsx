@@ -40,7 +40,7 @@ export default function WeightPage() {
   };
 
   if (!mounted) {
-    return <div className="p-4 animate-pulse"><div className="h-64 bg-[#1a1a24] rounded-2xl"></div></div>;
+    return <div className="p-4 animate-pulse"><div className="h-64 bg-zinc-900 rounded-xl"></div></div>;
   }
 
   const movingAvg = getMovingAverage(weights);
@@ -58,11 +58,11 @@ export default function WeightPage() {
     <div className="p-4 pb-24">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Gewicht</h1>
-          <p className="text-gray-400 text-sm">Verfolge deinen Fortschritt</p>
+          <p className="text-zinc-500 text-sm">Verfolge deinen Fortschritt</p>
+          <h1 className="text-xl font-semibold tracking-tight">Gewicht</h1>
         </div>
         <Button onClick={() => setShowForm(!showForm)} size="sm">
-          <Plus size={18} className="mr-1" /> Eintragen
+          <Plus size={16} className="mr-1" /> Eintragen
         </Button>
       </div>
 
@@ -94,17 +94,17 @@ export default function WeightPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <Card>
-          <p className="text-xs text-gray-400">Aktuell</p>
-          <p className="text-lg font-bold">{latestWeight || '--'} <span className="text-xs text-gray-400">kg</span></p>
+        <Card className="p-3">
+          <p className="text-xs text-zinc-500">Aktuell</p>
+          <p className="text-lg font-semibold">{latestWeight || '--'} <span className="text-xs text-zinc-500">kg</span></p>
         </Card>
-        <Card>
-          <p className="text-xs text-gray-400">Ziel</p>
-          <p className="text-lg font-bold">{goalWeight || '--'} <span className="text-xs text-gray-400">kg</span></p>
+        <Card className="p-3">
+          <p className="text-xs text-zinc-500">Ziel</p>
+          <p className="text-lg font-semibold">{goalWeight || '--'} <span className="text-xs text-zinc-500">kg</span></p>
         </Card>
-        <Card>
-          <p className="text-xs text-gray-400">Verloren</p>
-          <p className="text-lg font-bold text-[#10b981]">
+        <Card className="p-3">
+          <p className="text-xs text-zinc-500">Verloren</p>
+          <p className="text-lg font-semibold text-emerald-500">
             {totalChange > 0 ? `-${totalChange.toFixed(1)}` : '--'} <span className="text-xs">kg</span>
           </p>
         </Card>
@@ -112,52 +112,52 @@ export default function WeightPage() {
 
       {/* Chart */}
       <Card className="mb-4">
-        <h3 className="text-sm font-medium text-gray-400 mb-4">Gewichtsverlauf</h3>
+        <h3 className="text-sm font-medium text-zinc-400 mb-4">Gewichtsverlauf</h3>
         {chartData.length > 0 ? (
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
-                  axisLine={{ stroke: '#2a2a3a' }}
+                  tick={{ fill: '#71717a', fontSize: 10 }}
+                  axisLine={{ stroke: '#27272a' }}
                   tickLine={false}
                 />
                 <YAxis
                   domain={['dataMin - 2', 'dataMax + 2']}
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tick={{ fill: '#71717a', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#1a1a24',
-                    border: '1px solid #2a2a3a',
+                    backgroundColor: '#18181b',
+                    border: '1px solid #27272a',
                     borderRadius: '8px',
                   }}
-                  labelStyle={{ color: '#9ca3af' }}
+                  labelStyle={{ color: '#a1a1aa' }}
                   formatter={(value) => value != null ? [`${value} kg`, ''] : []}
                 />
                 {goalWeight && (
                   <ReferenceLine
                     y={goalWeight}
-                    stroke="#8b5cf6"
+                    stroke="#a1a1aa"
                     strokeDasharray="5 5"
-                    label={{ value: 'Ziel', fill: '#8b5cf6', fontSize: 10 }}
+                    label={{ value: 'Ziel', fill: '#a1a1aa', fontSize: 10 }}
                   />
                 )}
                 <Line
                   type="monotone"
                   dataKey="weight"
-                  stroke="#6b7280"
+                  stroke="#52525b"
                   strokeWidth={1}
-                  dot={{ fill: '#6b7280', r: 3 }}
+                  dot={{ fill: '#52525b', r: 3 }}
                   name="Gewicht"
                 />
                 <Line
                   type="monotone"
                   dataKey="avg"
-                  stroke="#10b981"
+                  stroke="#22c55e"
                   strokeWidth={2}
                   dot={false}
                   name="7-Tage Ø"
@@ -166,7 +166,7 @@ export default function WeightPage() {
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="h-48 flex items-center justify-center text-gray-500">
+          <div className="h-48 flex items-center justify-center text-zinc-500">
             <div className="text-center">
               <TrendingDown size={32} className="mx-auto mb-2 opacity-50" />
               <p>Noch keine Daten. Trage dein erstes Gewicht ein!</p>
@@ -177,18 +177,18 @@ export default function WeightPage() {
 
       {/* History */}
       <Card>
-        <h3 className="text-sm font-medium text-gray-400 mb-3">Verlauf</h3>
+        <h3 className="text-sm font-medium text-zinc-400 mb-3">Verlauf</h3>
         <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
           {[...weights].reverse().slice(0, 10).map((entry, i) => (
-            <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
-              <span className="text-gray-400 text-sm">
+            <div key={i} className="flex justify-between items-center py-2 border-b border-zinc-800 last:border-0">
+              <span className="text-zinc-400 text-sm">
                 {format(new Date(entry.date), 'd. MMMM yyyy', { locale: de })}
               </span>
               <span className="font-medium">{entry.weight} kg</span>
             </div>
           ))}
           {weights.length === 0 && (
-            <p className="text-gray-500 text-center py-4">Noch keine Einträge</p>
+            <p className="text-zinc-500 text-center py-4">Noch keine Einträge</p>
           )}
         </div>
       </Card>

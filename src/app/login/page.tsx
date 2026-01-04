@@ -51,14 +51,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#0a0a0f]">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-zinc-950">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[#8b5cf6] to-[#10b981] flex items-center justify-center">
-            <Lock size={32} className="text-white" />
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center">
+            <Lock size={28} className="text-zinc-300" />
           </div>
-          <h1 className="text-2xl font-bold">CutBoard</h1>
-          <p className="text-gray-400 text-sm mt-1">Gib deinen PIN ein</p>
+          <h1 className="text-2xl font-semibold tracking-tight">CutBoard</h1>
+          <p className="text-zinc-500 text-sm mt-1">Gib deinen PIN ein</p>
         </div>
 
         <Card className="mb-6">
@@ -70,8 +70,8 @@ export default function LoginPage() {
                   key={i}
                   className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold transition-all ${
                     pin.length > i
-                      ? 'bg-[#8b5cf6] text-white'
-                      : 'bg-[#1a1a24] text-gray-600'
+                      ? 'bg-white text-black'
+                      : 'bg-zinc-800 text-zinc-600'
                   }`}
                 >
                   {pin.length > i ? '•' : ''}
@@ -89,7 +89,7 @@ export default function LoginPage() {
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, 'del'].map((item, i) => (
                 <button
                   key={i}
-                  type={item === null ? 'button' : item === 'del' ? 'button' : 'button'}
+                  type="button"
                   onClick={() => {
                     if (item === 'del') handleBackspace();
                     else if (item !== null) handlePinInput(item.toString());
@@ -99,8 +99,8 @@ export default function LoginPage() {
                     item === null
                       ? 'invisible'
                       : item === 'del'
-                      ? 'bg-[#1a1a24] text-gray-400 hover:bg-[#252532]'
-                      : 'bg-[#1a1a24] text-white hover:bg-[#252532] active:scale-95'
+                      ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                      : 'bg-zinc-800 text-white hover:bg-zinc-700 active:scale-95'
                   }`}
                 >
                   {item === 'del' ? '←' : item}
@@ -123,7 +123,7 @@ export default function LoginPage() {
           </form>
         </Card>
 
-        <p className="text-center text-xs text-gray-500">
+        <p className="text-center text-xs text-zinc-600">
           Deine Daten sind sicher verschlüsselt
         </p>
       </div>

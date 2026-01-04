@@ -1,25 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0f;
-  --foreground: #ededed;
-  --card: #13131a;
-  --card-hover: #1a1a24;
-  --border: #2a2a3a;
-  --primary: #8b5cf6;
-  --primary-glow: rgba(139, 92, 246, 0.3);
-  --success: #10b981;
-  --warning: #f59e0b;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --muted: #a1a1aa;
+  --muted-foreground: #71717a;
+  --card: #18181b;
+  --card-hover: #27272a;
+  --border: #27272a;
+  --accent: #fafafa;
+  --success: #22c55e;
+  --warning: #eab308;
   --danger: #ef4444;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
   --color-card: var(--card);
-  --color-card-hover: var(--card-hover);
   --color-border: var(--border);
-  --color-primary: var(--primary);
+  --color-accent: var(--accent);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
@@ -32,33 +33,29 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Glassmorphism card */
+/* Clean card - no glassmorphism */
 .glass-card {
-  background: linear-gradient(135deg, rgba(19, 19, 26, 0.9) 0%, rgba(19, 19, 26, 0.7) 100%);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
 }
 
-/* Glowing border effect */
+.glass-card:hover {
+  background: var(--card-hover);
+}
+
+/* Subtle highlight on active */
 .glow-border {
-  box-shadow: 0 0 20px var(--primary-glow);
+  border-color: #3f3f46;
 }
 
-/* Progress ring animation */
-@keyframes progress-ring {
-  from {
-    stroke-dashoffset: 283;
-  }
-}
-
-/* Smooth transitions */
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
-  transition-duration: 150ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+/* Smooth transitions - only essentials */
+button, a, input, .transition-all {
+  transition: all 150ms ease;
 }
 
 /* Hide scrollbar but keep functionality */
@@ -78,4 +75,15 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+/* Clean focus states */
+input:focus, button:focus {
+  outline: none;
+  border-color: #52525b;
+}
+
+/* Selection */
+::selection {
+  background: #3f3f46;
 }
