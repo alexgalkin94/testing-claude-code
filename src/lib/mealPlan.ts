@@ -1,167 +1,308 @@
-// Day A & Day B Meal Plans
+// Simplified Meal Plan with grouped interchangeable items
 
-export type MealOption = {
+export interface MealItem {
+  id: string;
   name: string;
+  options?: string[]; // Alternative choices
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
-};
+}
 
-export type MealSlot = {
+export interface Meal {
+  id: string;
   name: string;
   time: string;
-  options: MealOption[];
-  totalCalories: number;
-  totalProtein: number;
-};
+  items: MealItem[];
+}
 
-export type DayPlan = {
+export interface DayPlan {
+  id: 'A' | 'B';
   name: string;
-  description: string;
-  meals: MealSlot[];
-  totalCalories: number;
-  totalProtein: number;
-};
+  meals: Meal[];
+  totals: { calories: number; protein: number; carbs: number; fat: number };
+}
 
-// Day A: "Iglo & Potato" Tag
+// Tag A: Iglo & Potato Tag
 export const DAY_A: DayPlan = {
-  name: 'Tag A',
-  description: 'Iglo & Potato Tag',
-  totalCalories: 1700,
-  totalProtein: 157,
+  id: 'A',
+  name: 'Iglo & Potato',
+  totals: { calories: 1700, protein: 157, carbs: 148, fat: 43 },
   meals: [
     {
-      name: 'Frühstück (Pre-Workout)',
-      time: '08:00',
-      totalCalories: 630,
-      totalProtein: 40,
-      options: [
-        { name: '3x Sammy\'s Super Sandwich', calories: 210, protein: 8, carbs: 36, fat: 3 },
-        { name: '2x Toastbrötchen (Weizen)', calories: 220, protein: 7, carbs: 40, fat: 2 },
-        { name: '80g Haferflocken', calories: 300, protein: 11, carbs: 52, fat: 6 },
-        { name: '3 Eier (L)', calories: 230, protein: 20, carbs: 1, fat: 16 },
-        { name: '30g Exquisa 0,2%', calories: 15, protein: 3, carbs: 1, fat: 0 },
-        { name: '2 Scheiben Backschinken (50g)', calories: 55, protein: 9, carbs: 1, fat: 2 },
+      id: 'breakfast-a',
+      name: 'Frühstück',
+      time: 'Pre-Workout',
+      items: [
+        {
+          id: 'carbs-breakfast',
+          name: 'Kohlenhydrate',
+          options: ['3x Sammy\'s Sandwich', '2x Toastbrötchen', '80g Haferflocken'],
+          calories: 220,
+          protein: 8,
+          carbs: 38,
+          fat: 3,
+        },
+        {
+          id: 'eggs',
+          name: '3 Eier (L)',
+          calories: 230,
+          protein: 20,
+          carbs: 1,
+          fat: 16,
+        },
+        {
+          id: 'exquisa',
+          name: '30g Exquisa 0,2%',
+          calories: 15,
+          protein: 3,
+          carbs: 1,
+          fat: 0,
+        },
+        {
+          id: 'schinken',
+          name: '2 Scheiben Backschinken',
+          calories: 55,
+          protein: 9,
+          carbs: 1,
+          fat: 2,
+        },
       ],
     },
     {
-      name: 'Mittag (Post-Workout)',
-      time: '13:00',
-      totalCalories: 470,
-      totalProtein: 45,
-      options: [
-        { name: 'Iglo Schlemmer-Filet Italiano', calories: 320, protein: 35, carbs: 15, fat: 8 },
-        { name: 'Iglo Schlemmer-Filet Broccoli', calories: 310, protein: 33, carbs: 14, fat: 7 },
-        { name: 'Iglo Schlemmer-Filet Champignon', calories: 305, protein: 32, carbs: 13, fat: 8 },
-        { name: '250g Kartoffeln', calories: 150, protein: 4, carbs: 30, fat: 0 },
-        { name: '200g Süßkartoffel', calories: 170, protein: 3, carbs: 38, fat: 0 },
-        { name: '50g Reis (trocken)', calories: 175, protein: 4, carbs: 38, fat: 1 },
-        { name: '50g Nudeln (trocken)', calories: 175, protein: 6, carbs: 35, fat: 1 },
+      id: 'lunch-a',
+      name: 'Mittag',
+      time: 'Post-Workout',
+      items: [
+        {
+          id: 'iglo',
+          name: 'Iglo Schlemmer-Filet',
+          options: ['Italiano', 'Broccoli', 'Champignon'],
+          calories: 310,
+          protein: 33,
+          carbs: 14,
+          fat: 8,
+        },
+        {
+          id: 'carbs-lunch',
+          name: 'Beilage',
+          options: ['250g Kartoffeln', '200g Süßkartoffel', '50g Reis', '50g Nudeln'],
+          calories: 160,
+          protein: 4,
+          carbs: 32,
+          fat: 0,
+        },
       ],
     },
     {
+      id: 'dinner-a',
       name: 'Abendessen',
-      time: '18:00',
-      totalCalories: 475,
-      totalProtein: 50,
-      options: [
-        { name: '200g Hähnchenbrust', calories: 220, protein: 46, carbs: 0, fat: 3 },
-        { name: '200g Putenbrust', calories: 210, protein: 44, carbs: 0, fat: 2 },
-        { name: '175g Rinderhack Light (5%)', calories: 210, protein: 38, carbs: 0, fat: 6 },
-        { name: '275g Weißfisch (Kabeljau)', calories: 220, protein: 50, carbs: 0, fat: 2 },
-        { name: '225g Garnelen', calories: 200, protein: 45, carbs: 1, fat: 2 },
-        { name: '1 Dose Thunfisch (im Saft)', calories: 190, protein: 42, carbs: 0, fat: 2 },
-        { name: 'Frosta Gemüsepfanne (480g)', calories: 260, protein: 8, carbs: 35, fat: 8 },
+      time: '~18:00',
+      items: [
+        {
+          id: 'protein-dinner',
+          name: 'Protein',
+          options: ['200g Hähnchen', '200g Pute', '175g Rinderhack 5%', '275g Weißfisch', '225g Garnelen', 'Dose Thunfisch'],
+          calories: 210,
+          protein: 44,
+          carbs: 0,
+          fat: 3,
+        },
+        {
+          id: 'veggies-dinner',
+          name: 'Frosta Gemüsepfanne 480g',
+          calories: 260,
+          protein: 8,
+          carbs: 35,
+          fat: 8,
+        },
       ],
     },
     {
+      id: 'snack-a',
       name: 'Snack',
-      time: '20:00',
-      totalCalories: 125,
-      totalProtein: 22,
-      options: [
-        { name: '200g Skyr Natur', calories: 130, protein: 22, carbs: 8, fat: 0 },
-        { name: '200g Magerquark', calories: 135, protein: 24, carbs: 8, fat: 0 },
-        { name: '150g Körniger Frischkäse Light', calories: 110, protein: 18, carbs: 6, fat: 2 },
-        { name: '30g Whey (in Wasser)', calories: 120, protein: 24, carbs: 2, fat: 1 },
+      time: 'Abends',
+      items: [
+        {
+          id: 'protein-snack',
+          name: 'Protein-Dessert',
+          options: ['200g Skyr', '200g Magerquark', '150g Körniger Frischkäse', '30g Whey'],
+          calories: 125,
+          protein: 22,
+          carbs: 8,
+          fat: 0,
+        },
       ],
     },
   ],
 };
 
-// Day B: "Variety" Tag
+// Tag B: Variety Tag
 export const DAY_B: DayPlan = {
-  name: 'Tag B',
-  description: 'Variety Tag',
-  totalCalories: 1705,
-  totalProtein: 156,
+  id: 'B',
+  name: 'Variety',
+  totals: { calories: 1705, protein: 156, carbs: 135, fat: 43 },
   meals: [
     {
-      name: 'Frühstück (Pre-Workout)',
-      time: '08:00',
-      totalCalories: 630,
-      totalProtein: 40,
-      options: [
-        { name: '3x Sammy\'s Super Sandwich', calories: 210, protein: 8, carbs: 36, fat: 3 },
-        { name: '2x Toastbrötchen (Weizen)', calories: 220, protein: 7, carbs: 40, fat: 2 },
-        { name: '80g Haferflocken', calories: 300, protein: 11, carbs: 52, fat: 6 },
-        { name: '3 Eier (L)', calories: 230, protein: 20, carbs: 1, fat: 16 },
-        { name: '30g Exquisa 0,2%', calories: 15, protein: 3, carbs: 1, fat: 0 },
-        { name: '2 Scheiben Backschinken (50g)', calories: 55, protein: 9, carbs: 1, fat: 2 },
+      id: 'breakfast-b',
+      name: 'Frühstück',
+      time: 'Pre-Workout',
+      items: [
+        {
+          id: 'carbs-breakfast-b',
+          name: 'Kohlenhydrate',
+          options: ['3x Sammy\'s Sandwich', '2x Toastbrötchen', '80g Haferflocken'],
+          calories: 220,
+          protein: 8,
+          carbs: 38,
+          fat: 3,
+        },
+        {
+          id: 'eggs-b',
+          name: '3 Eier (L)',
+          calories: 230,
+          protein: 20,
+          carbs: 1,
+          fat: 16,
+        },
+        {
+          id: 'exquisa-b',
+          name: '30g Exquisa 0,2%',
+          calories: 15,
+          protein: 3,
+          carbs: 1,
+          fat: 0,
+        },
+        {
+          id: 'schinken-b',
+          name: '2 Scheiben Backschinken',
+          calories: 55,
+          protein: 9,
+          carbs: 1,
+          fat: 2,
+        },
       ],
     },
     {
-      name: 'Mittag (Post-Workout)',
-      time: '13:00',
-      totalCalories: 590,
-      totalProtein: 55,
-      options: [
-        { name: '200g Hähnchenbrust', calories: 220, protein: 46, carbs: 0, fat: 3 },
-        { name: '200g Pute', calories: 210, protein: 44, carbs: 0, fat: 2 },
-        { name: '275g Weißfisch', calories: 220, protein: 50, carbs: 0, fat: 2 },
-        { name: '225g Garnelen', calories: 200, protein: 45, carbs: 1, fat: 2 },
-        { name: '70g Reis (trocken)', calories: 245, protein: 5, carbs: 54, fat: 1 },
-        { name: '70g Nudeln (trocken)', calories: 245, protein: 9, carbs: 49, fat: 2 },
-        { name: '350g Kartoffeln', calories: 210, protein: 6, carbs: 42, fat: 0 },
-        { name: '1/2 Frosta Gemüsepfanne (240g)', calories: 130, protein: 4, carbs: 18, fat: 4 },
+      id: 'lunch-b',
+      name: 'Mittag',
+      time: 'Post-Workout',
+      items: [
+        {
+          id: 'protein-lunch-b',
+          name: 'Protein',
+          options: ['200g Hähnchen', '200g Pute', '275g Weißfisch', '225g Garnelen'],
+          calories: 215,
+          protein: 45,
+          carbs: 0,
+          fat: 3,
+        },
+        {
+          id: 'carbs-lunch-b',
+          name: 'Beilage (mehr Carbs)',
+          options: ['70g Reis', '70g Nudeln', '350g Kartoffeln'],
+          calories: 245,
+          protein: 6,
+          carbs: 50,
+          fat: 1,
+        },
+        {
+          id: 'veggies-lunch-b',
+          name: '½ Frosta Gemüsepfanne',
+          calories: 130,
+          protein: 4,
+          carbs: 18,
+          fat: 4,
+        },
       ],
     },
     {
+      id: 'dinner-b',
       name: 'Abendessen',
-      time: '18:00',
-      totalCalories: 390,
-      totalProtein: 45,
-      options: [
-        { name: '175g Rinderhack Light (5%)', calories: 210, protein: 38, carbs: 0, fat: 6 },
-        { name: '175g Rindertartar', calories: 200, protein: 36, carbs: 0, fat: 6 },
-        { name: '200g Hähnchenbrust', calories: 220, protein: 46, carbs: 0, fat: 3 },
-        { name: '200g Schweinefilet', calories: 230, protein: 42, carbs: 0, fat: 6 },
-        { name: '275g Weißfisch', calories: 220, protein: 50, carbs: 0, fat: 2 },
-        { name: '1/2 Frosta Gemüsepfanne (240g)', calories: 130, protein: 4, carbs: 18, fat: 4 },
+      time: '~18:00',
+      items: [
+        {
+          id: 'protein-dinner-b',
+          name: 'Protein (herzhaft)',
+          options: ['175g Rinderhack 5%', '175g Rindertartar', '200g Hähnchen', '200g Schweinefilet', '275g Weißfisch'],
+          calories: 215,
+          protein: 40,
+          carbs: 0,
+          fat: 5,
+        },
+        {
+          id: 'veggies-dinner-b',
+          name: '½ Frosta Gemüsepfanne',
+          calories: 130,
+          protein: 4,
+          carbs: 18,
+          fat: 4,
+        },
       ],
     },
     {
+      id: 'snack-b',
       name: 'Snack',
-      time: '20:00',
-      totalCalories: 95,
-      totalProtein: 16,
-      options: [
-        { name: '150g Skyr Natur', calories: 98, protein: 17, carbs: 6, fat: 0 },
-        { name: '150g Magerquark', calories: 100, protein: 18, carbs: 6, fat: 0 },
-        { name: '25g Whey (in Wasser)', calories: 100, protein: 20, carbs: 2, fat: 1 },
+      time: 'Abends',
+      items: [
+        {
+          id: 'protein-snack-b',
+          name: 'Protein-Dessert',
+          options: ['150g Skyr', '150g Magerquark', '25g Whey'],
+          calories: 95,
+          protein: 17,
+          carbs: 6,
+          fat: 0,
+        },
       ],
     },
   ],
 };
 
-// Speichern welcher Tag heute gewählt ist
+// Storage functions
+const STORAGE_KEY = 'cutboard_checklist';
+const DAY_TYPE_KEY = 'cutboard_day_type';
+
+export interface CheckedItems {
+  [date: string]: string[]; // Array of checked item IDs
+}
+
+export function getCheckedItems(): CheckedItems {
+  if (typeof window === 'undefined') return {};
+  const data = localStorage.getItem(STORAGE_KEY);
+  return data ? JSON.parse(data) : {};
+}
+
+export function toggleItem(date: string, itemId: string): void {
+  const checked = getCheckedItems();
+  if (!checked[date]) checked[date] = [];
+
+  const index = checked[date].indexOf(itemId);
+  if (index >= 0) {
+    checked[date].splice(index, 1);
+  } else {
+    checked[date].push(itemId);
+  }
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(checked));
+}
+
+export function isItemChecked(date: string, itemId: string): boolean {
+  const checked = getCheckedItems();
+  return checked[date]?.includes(itemId) || false;
+}
+
 export function getDayType(): 'A' | 'B' {
   if (typeof window === 'undefined') return 'A';
-  return (localStorage.getItem('cutboard_day_type') as 'A' | 'B') || 'A';
+  return (localStorage.getItem(DAY_TYPE_KEY) as 'A' | 'B') || 'A';
 }
 
 export function setDayType(type: 'A' | 'B'): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem('cutboard_day_type', type);
+  localStorage.setItem(DAY_TYPE_KEY, type);
+}
+
+export function getPlan(type: 'A' | 'B'): DayPlan {
+  return type === 'A' ? DAY_A : DAY_B;
 }

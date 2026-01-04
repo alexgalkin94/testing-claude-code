@@ -5,19 +5,15 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Scale,
-  Utensils,
-  ClipboardList,
   Camera,
-  Timer,
+  ShoppingCart,
 } from 'lucide-react';
 
 const navItems = [
-  { href: '/', icon: LayoutDashboard, label: 'Home' },
-  { href: '/weight', icon: Scale, label: 'Weight' },
-  { href: '/calories', icon: Utensils, label: 'Food' },
-  { href: '/plan', icon: ClipboardList, label: 'Plan' },
-  { href: '/photos', icon: Camera, label: 'Photos' },
-  { href: '/fasting', icon: Timer, label: 'Fast' },
+  { href: '/', icon: LayoutDashboard, label: 'Heute' },
+  { href: '/weight', icon: Scale, label: 'Gewicht' },
+  { href: '/photos', icon: Camera, label: 'Fotos' },
+  { href: '/shopping', icon: ShoppingCart, label: 'Einkauf' },
 ];
 
 export default function BottomNav() {
@@ -32,14 +28,14 @@ export default function BottomNav() {
             <Link
               key={href}
               href={href}
-              className={`flex flex-col items-center justify-center px-2 py-1 rounded-lg min-w-[48px] ${
+              className={`flex flex-col items-center justify-center px-4 py-1 rounded-lg ${
                 isActive
                   ? 'text-[#8b5cf6]'
                   : 'text-gray-400 hover:text-gray-200'
               }`}
             >
               <Icon
-                size={20}
+                size={22}
                 className={isActive ? 'drop-shadow-[0_0_8px_rgba(139,92,246,0.5)]' : ''}
               />
               <span className="text-[10px] mt-1 font-medium">{label}</span>

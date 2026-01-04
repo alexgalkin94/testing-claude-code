@@ -26,7 +26,7 @@ export default function WeightPage() {
   const loadData = () => {
     setWeights(getWeights());
     const settings = getSettings();
-    if (settings?.goalWeight) {
+    if (settings) {
       setGoalWeight(settings.goalWeight);
     }
   };
@@ -45,7 +45,7 @@ export default function WeightPage() {
 
   const movingAvg = getMovingAverage(weights);
   const chartData = weights.map((w, i) => ({
-    date: format(new Date(w.date), 'd.M.'),
+    date: format(new Date(w.date), 'd.M.', { locale: de }),
     weight: w.weight,
     avg: movingAvg[i]?.avg,
   }));
@@ -55,7 +55,7 @@ export default function WeightPage() {
   const totalChange = firstWeight && latestWeight ? firstWeight - latestWeight : 0;
 
   return (
-    <div className="p-4">
+    <div className="p-4 pb-24">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">Gewicht</h1>
@@ -105,7 +105,7 @@ export default function WeightPage() {
         <Card>
           <p className="text-xs text-gray-400">Verloren</p>
           <p className="text-lg font-bold text-[#10b981]">
-            {totalChange > 0 ? `-${totalChange.toFixed(1)}` : '--'}
+            {totalChange > 0 ? `-${totalChange.toFixed(1)}` : '--'} <span className="text-xs">kg</span>
           </p>
         </Card>
       </div>
@@ -136,7 +136,7 @@ export default function WeightPage() {
                     borderRadius: '8px',
                   }}
                   labelStyle={{ color: '#9ca3af' }}
-                  formatter={(value) => value != null ? [`${value} kg`, ''] : ['', '']}
+                  formatter={(value) => value != null ? [`${value} kg`, ''] : []}
                 />
                 {goalWeight && (
                   <ReferenceLine
@@ -152,6 +152,7 @@ export default function WeightPage() {
                   stroke="#6b7280"
                   strokeWidth={1}
                   dot={{ fill: '#6b7280', r: 3 }}
+                  name="Gewicht"
                 />
                 <Line
                   type="monotone"
@@ -168,7 +169,7 @@ export default function WeightPage() {
           <div className="h-48 flex items-center justify-center text-gray-500">
             <div className="text-center">
               <TrendingDown size={32} className="mx-auto mb-2 opacity-50" />
-              <p>Noch keine Daten. Trag dein erstes Gewicht ein!</p>
+              <p>Noch keine Daten. Trage dein erstes Gewicht ein!</p>
             </div>
           </div>
         )}
@@ -181,7 +182,7 @@ export default function WeightPage() {
           {[...weights].reverse().slice(0, 10).map((entry, i) => (
             <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
               <span className="text-gray-400 text-sm">
-                {format(new Date(entry.date), 'd. MMM yyyy', { locale: de })}
+                {format(new Date(entry.date), 'd. MMMM yyyy', { locale: de })}
               </span>
               <span className="font-medium">{entry.weight} kg</span>
             </div>
