@@ -11,6 +11,10 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "CutBoard",
   },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
