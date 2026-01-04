@@ -7,6 +7,7 @@ import {
   Scale,
   Camera,
   ShoppingCart,
+  Settings,
 } from 'lucide-react';
 
 const navItems = [
@@ -14,6 +15,7 @@ const navItems = [
   { href: '/weight', icon: Scale, label: 'Gewicht' },
   { href: '/photos', icon: Camera, label: 'Fotos' },
   { href: '/shopping', icon: ShoppingCart, label: 'Einkauf' },
+  { href: '/settings', icon: Settings, label: 'Setup' },
 ];
 
 export default function BottomNav() {
