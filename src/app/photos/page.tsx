@@ -14,15 +14,6 @@ interface Photo {
   uploadedAt: string;
 }
 
-// Auth token for API access
-const AUTH_TOKEN_KEY = 'cutboard_auth_token';
-const DEFAULT_TOKEN = 'alex_secret_2024';
-
-function getAuthToken(): string {
-  if (typeof window === 'undefined') return DEFAULT_TOKEN;
-  return localStorage.getItem(AUTH_TOKEN_KEY) || DEFAULT_TOKEN;
-}
-
 export default function PhotosPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,9 +29,7 @@ export default function PhotosPage() {
   const loadPhotos = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/photos', {
-        headers: { 'x-auth-token': getAuthToken() },
-      });
+      const response = await fetch('/api/photos');
       if (response.ok) {
         const data = await response.json();
         setPhotos(data);
@@ -63,7 +52,6 @@ export default function PhotosPage() {
 
       const response = await fetch('/api/photos', {
         method: 'POST',
-        headers: { 'x-auth-token': getAuthToken() },
         body: formData,
       });
 
@@ -81,10 +69,7 @@ export default function PhotosPage() {
     try {
       const response = await fetch('/api/photos', {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-token': getAuthToken(),
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: photo.url }),
       });
 

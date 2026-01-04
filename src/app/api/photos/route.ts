@@ -1,24 +1,20 @@
 import { put, list, del } from '@vercel/blob';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { randomUUID } from 'crypto';
 
 const USER_ID = 'alex_cutboard';
 const PHOTOS_PREFIX = `${USER_ID}/photos/`;
+const SESSION_COOKIE = 'cutboard_session';
 
-// Simple token check - in production use proper auth
-const AUTH_TOKEN = process.env.CUTBOARD_AUTH_TOKEN || 'alex_secret_2024';
-
-function checkAuth(request: Request): boolean {
-  const authHeader = request.headers.get('x-auth-token');
-  const url = new URL(request.url);
-  const tokenParam = url.searchParams.get('token');
-
-  return authHeader === AUTH_TOKEN || tokenParam === AUTH_TOKEN;
+async function isAuthenticated(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const session = cookieStore.get(SESSION_COOKIE);
+  return !!session?.value;
 }
 
-export async function GET(request: Request) {
-  // Auth check for listing photos
-  if (!checkAuth(request)) {
+export async function GET() {
+  if (!(await isAuthenticated())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -26,7 +22,6 @@ export async function GET(request: Request) {
     const { blobs } = await list({ prefix: PHOTOS_PREFIX });
 
     const photos = blobs.map(blob => {
-      // Extract date from filename (format: YYYY-MM-DD_uuid.ext)
       const filename = blob.pathname.split('/').pop() || '';
       const datePart = filename.split('_')[0];
 
@@ -46,8 +41,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  // Auth check for uploads
-  if (!checkAuth(request)) {
+  if (!(await isAuthenticated())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -60,13 +54,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Use UUID for unguessable filename - privacy through obscurity
+    // UUID for unguessable filename
     const uuid = randomUUID();
     const ext = file.name.split('.').pop() || 'jpg';
     const filename = `${PHOTOS_PREFIX}${date}_${uuid}.${ext}`;
 
     const blob = await put(filename, file, {
-      access: 'public', // URL is public but unguessable
+      access: 'public',
       addRandomSuffix: false,
     });
 
@@ -82,8 +76,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  // Auth check for deletion
-  if (!checkAuth(request)) {
+  if (!(await isAuthenticated())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -94,7 +87,6 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'No URL provided' }, { status: 400 });
     }
 
-    // Verify URL belongs to this user
     if (!url.includes(USER_ID)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
