@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, User, Target, Flame, Calendar, Cloud, Check } from 'lucide-react';
+import { Save, User, Target, Flame, Check, Cloud } from 'lucide-react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
@@ -97,10 +97,10 @@ export default function SettingsPage() {
   if (!mounted) {
     return (
       <div className="p-4 animate-pulse">
-        <div className="h-8 bg-[#1a1a24] rounded w-1/2 mb-4"></div>
+        <div className="h-8 bg-zinc-900 rounded w-1/2 mb-4"></div>
         <div className="space-y-4">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-24 bg-[#1a1a24] rounded-2xl"></div>
+            <div key={i} className="h-24 bg-zinc-900 rounded-xl"></div>
           ))}
         </div>
       </div>
@@ -111,8 +111,8 @@ export default function SettingsPage() {
     <div className="p-4 pb-24">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Einstellungen</h1>
-          <p className="text-gray-400 text-sm">Deine persönlichen Ziele</p>
+          <p className="text-zinc-500 text-sm">Deine persönlichen Ziele</p>
+          <h1 className="text-xl font-semibold tracking-tight">Einstellungen</h1>
         </div>
         <Button onClick={handleSave} disabled={saving}>
           {saved ? (
@@ -128,8 +128,8 @@ export default function SettingsPage() {
       {/* Profile */}
       <Card className="mb-4">
         <div className="flex items-center gap-2 mb-4">
-          <User size={18} className="text-[#8b5cf6]" />
-          <h2 className="font-semibold">Profil</h2>
+          <User size={18} className="text-zinc-400" />
+          <h2 className="font-medium">Profil</h2>
         </div>
         <div className="space-y-4">
           <Input
@@ -150,8 +150,8 @@ export default function SettingsPage() {
       {/* Weight Goals */}
       <Card className="mb-4">
         <div className="flex items-center gap-2 mb-4">
-          <Target size={18} className="text-[#10b981]" />
-          <h2 className="font-semibold">Gewichtsziele</h2>
+          <Target size={18} className="text-emerald-500" />
+          <h2 className="font-medium">Gewichtsziele</h2>
         </div>
         <div className="space-y-4">
           <Input
@@ -181,14 +181,14 @@ export default function SettingsPage() {
         </div>
 
         {/* Progress Preview */}
-        <div className="mt-4 pt-4 border-t border-white/10">
-          <div className="flex justify-between text-sm text-gray-400 mb-1">
+        <div className="mt-4 pt-4 border-t border-zinc-800">
+          <div className="flex justify-between text-sm text-zinc-500 mb-1">
             <span>{profile.startWeight} kg</span>
             <span>{profile.goalWeight} kg</span>
           </div>
-          <div className="h-2 bg-[#1a1a24] rounded-full overflow-hidden">
+          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-[#8b5cf6] to-[#10b981]"
+              className="h-full bg-white rounded-full"
               style={{
                 width: `${Math.max(0, Math.min(100,
                   ((profile.startWeight - profile.currentWeight) /
@@ -197,7 +197,7 @@ export default function SettingsPage() {
               }}
             />
           </div>
-          <p className="text-center text-xs text-gray-400 mt-2">
+          <p className="text-center text-xs text-zinc-500 mt-2">
             Noch {(profile.currentWeight - profile.goalWeight).toFixed(1)} kg bis zum Ziel
           </p>
         </div>
@@ -206,8 +206,8 @@ export default function SettingsPage() {
       {/* Nutrition Goals */}
       <Card className="mb-4">
         <div className="flex items-center gap-2 mb-4">
-          <Flame size={18} className="text-[#f59e0b]" />
-          <h2 className="font-semibold">Ernährungsziele</h2>
+          <Flame size={18} className="text-orange-500" />
+          <h2 className="font-medium">Ernährungsziele</h2>
         </div>
         <div className="space-y-4">
           <Input
@@ -234,25 +234,25 @@ export default function SettingsPage() {
         </div>
 
         {/* Deficit Info */}
-        <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-4">
+        <div className="mt-4 pt-4 border-t border-zinc-800 grid grid-cols-2 gap-4">
           <div className="text-center">
-            <p className="text-2xl font-bold text-[#ef4444]">
+            <p className="text-2xl font-semibold text-red-400">
               -{profile.tdee - profile.calorieTarget}
             </p>
-            <p className="text-xs text-gray-400">kcal Defizit/Tag</p>
+            <p className="text-xs text-zinc-500">kcal Defizit/Tag</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-[#10b981]">
+            <p className="text-2xl font-semibold text-emerald-500">
               ~{((profile.tdee - profile.calorieTarget) * 7 / 7700).toFixed(2)}
             </p>
-            <p className="text-xs text-gray-400">kg Verlust/Woche</p>
+            <p className="text-xs text-zinc-500">kg Verlust/Woche</p>
           </div>
         </div>
       </Card>
 
       {/* Info */}
-      <Card className="bg-[#8b5cf6]/10 border-[#8b5cf6]/20">
-        <p className="text-sm text-gray-300">
+      <Card className="bg-zinc-800/50 border-zinc-700">
+        <p className="text-sm text-zinc-300">
           <strong>Tipp:</strong> Ein Defizit von 500-750 kcal/Tag entspricht ca. 0.5-0.75 kg Fettverlust pro Woche - ideal für Muskelerhalt.
         </p>
       </Card>

@@ -1,12 +1,23 @@
-import { put, list, del } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 const USER_ID = 'alex_cutboard';
 const DATA_PATH = `${USER_ID}/data.json`;
+const SESSION_COOKIE = 'cutboard_session';
+
+async function isAuthenticated(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const session = cookieStore.get(SESSION_COOKIE);
+  return !!session?.value;
+}
 
 export async function GET() {
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    // List blobs to find our data file
     const { blobs } = await list({ prefix: USER_ID });
     const dataBlob = blobs.find(b => b.pathname === DATA_PATH);
 
@@ -14,7 +25,6 @@ export async function GET() {
       return NextResponse.json(null);
     }
 
-    // Fetch the JSON data
     const response = await fetch(dataBlob.url);
     const data = await response.json();
     return NextResponse.json(data);
@@ -25,11 +35,14 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const data = await request.json();
     data.lastSync = new Date().toISOString();
 
-    // Store as JSON blob
     const blob = await put(DATA_PATH, JSON.stringify(data), {
       access: 'public',
       addRandomSuffix: false,

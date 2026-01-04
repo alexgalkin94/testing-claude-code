@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Camera, Trash2, ArrowLeftRight, X, Cloud, Loader2, Lock } from 'lucide-react';
+import { Camera, Trash2, ArrowLeftRight, X, Cloud, Loader2 } from 'lucide-react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 
@@ -12,15 +12,6 @@ interface Photo {
   pathname: string;
   date: string;
   uploadedAt: string;
-}
-
-// Auth token for API access
-const AUTH_TOKEN_KEY = 'cutboard_auth_token';
-const DEFAULT_TOKEN = 'alex_secret_2024';
-
-function getAuthToken(): string {
-  if (typeof window === 'undefined') return DEFAULT_TOKEN;
-  return localStorage.getItem(AUTH_TOKEN_KEY) || DEFAULT_TOKEN;
 }
 
 export default function PhotosPage() {
@@ -38,9 +29,7 @@ export default function PhotosPage() {
   const loadPhotos = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/photos', {
-        headers: { 'x-auth-token': getAuthToken() },
-      });
+      const response = await fetch('/api/photos');
       if (response.ok) {
         const data = await response.json();
         setPhotos(data);
@@ -63,7 +52,6 @@ export default function PhotosPage() {
 
       const response = await fetch('/api/photos', {
         method: 'POST',
-        headers: { 'x-auth-token': getAuthToken() },
         body: formData,
       });
 
@@ -81,10 +69,7 @@ export default function PhotosPage() {
     try {
       const response = await fetch('/api/photos', {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-token': getAuthToken(),
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: photo.url }),
       });
 
@@ -118,11 +103,11 @@ export default function PhotosPage() {
   if (loading) {
     return (
       <div className="p-4 animate-pulse">
-        <div className="h-8 bg-[#1a1a24] rounded w-1/2 mb-4"></div>
-        <div className="h-32 bg-[#1a1a24] rounded-2xl mb-4"></div>
+        <div className="h-8 bg-zinc-900 rounded w-1/2 mb-4"></div>
+        <div className="h-32 bg-zinc-900 rounded-xl mb-4"></div>
         <div className="grid grid-cols-3 gap-2">
           {[1, 2, 3].map(i => (
-            <div key={i} className="aspect-[3/4] bg-[#1a1a24] rounded-xl"></div>
+            <div key={i} className="aspect-[3/4] bg-zinc-900 rounded-xl"></div>
           ))}
         </div>
       </div>
@@ -133,8 +118,8 @@ export default function PhotosPage() {
     <div className="p-4 pb-24">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Fortschrittsfotos</h1>
-          <p className="text-gray-400 text-sm">Dokumentiere deine Reise</p>
+          <p className="text-zinc-500 text-sm">Dokumentiere deine Reise</p>
+          <h1 className="text-xl font-semibold tracking-tight">Fortschrittsfotos</h1>
         </div>
         <Button
           onClick={() => setCompareMode(!compareMode)}
@@ -149,11 +134,11 @@ export default function PhotosPage() {
       {/* Compare View */}
       {compareMode && (
         <Card className="mb-4" glow>
-          <p className="text-sm text-gray-400 mb-3">
+          <p className="text-sm text-zinc-400 mb-3">
             {comparePhotos[0] ? 'Wähle zweites Foto' : 'Wähle erstes Foto'}
           </p>
           <div className="grid grid-cols-2 gap-4">
-            <div className="aspect-[3/4] bg-[#1a1a24] rounded-xl overflow-hidden">
+            <div className="aspect-[3/4] bg-zinc-800 rounded-xl overflow-hidden">
               {comparePhotos[0] ? (
                 <img
                   src={comparePhotos[0].url}
@@ -161,12 +146,12 @@ export default function PhotosPage() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-500">
+                <div className="w-full h-full flex items-center justify-center text-zinc-600">
                   Vorher
                 </div>
               )}
             </div>
-            <div className="aspect-[3/4] bg-[#1a1a24] rounded-xl overflow-hidden">
+            <div className="aspect-[3/4] bg-zinc-800 rounded-xl overflow-hidden">
               {comparePhotos[1] ? (
                 <img
                   src={comparePhotos[1].url}
@@ -174,7 +159,7 @@ export default function PhotosPage() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-500">
+                <div className="w-full h-full flex items-center justify-center text-zinc-600">
                   Nachher
                 </div>
               )}
@@ -204,17 +189,17 @@ export default function PhotosPage() {
             onChange={handleFileSelect}
             disabled={uploading}
           />
-          <Card className="text-center py-6 hover:bg-[#1a1a24] border-dashed border-2 border-white/10">
+          <Card className="text-center py-6 hover:bg-zinc-800/50 border-dashed border-2 border-zinc-800">
             {uploading ? (
               <>
-                <Loader2 size={32} className="mx-auto mb-2 text-[#8b5cf6] animate-spin" />
-                <p className="text-sm text-gray-400">Wird hochgeladen...</p>
+                <Loader2 size={32} className="mx-auto mb-2 text-zinc-400 animate-spin" />
+                <p className="text-sm text-zinc-400">Wird hochgeladen...</p>
               </>
             ) : (
               <>
-                <Camera size={32} className="mx-auto mb-2 text-[#8b5cf6]" />
+                <Camera size={32} className="mx-auto mb-2 text-zinc-400" />
                 <p className="font-medium">Foto aufnehmen</p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-zinc-500 mt-1">
                   <Cloud size={12} className="inline mr-1" />
                   Wird in der Cloud gespeichert
                 </p>
@@ -230,7 +215,7 @@ export default function PhotosPage() {
           .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
           .map(([date, datePhotos]) => (
             <div key={date} className="mb-6">
-              <p className="text-sm text-gray-400 mb-2">
+              <p className="text-sm text-zinc-400 mb-2">
                 {date !== 'Unbekannt'
                   ? format(new Date(date), 'd. MMMM yyyy', { locale: de })
                   : 'Unbekannt'}
@@ -242,7 +227,7 @@ export default function PhotosPage() {
                     onClick={() => compareMode ? handleCompareSelect(photo) : setShowViewer(photo)}
                     className={`aspect-[3/4] rounded-xl overflow-hidden cursor-pointer relative ${
                       compareMode && (comparePhotos[0]?.url === photo.url || comparePhotos[1]?.url === photo.url)
-                        ? 'ring-2 ring-[#8b5cf6]'
+                        ? 'ring-2 ring-white'
                         : ''
                     }`}
                   >
@@ -258,9 +243,9 @@ export default function PhotosPage() {
           ))
       ) : (
         <Card className="text-center py-12">
-          <Camera size={48} className="mx-auto mb-3 text-gray-600" />
-          <p className="text-gray-400">Noch keine Fotos</p>
-          <p className="text-sm text-gray-500 mt-1">Mach dein erstes Fortschrittsfoto!</p>
+          <Camera size={48} className="mx-auto mb-3 text-zinc-700" />
+          <p className="text-zinc-400">Noch keine Fotos</p>
+          <p className="text-sm text-zinc-500 mt-1">Mach dein erstes Fortschrittsfoto!</p>
         </Card>
       )}
 
@@ -285,7 +270,7 @@ export default function PhotosPage() {
             className="max-w-full max-h-[80vh] object-contain rounded-xl"
           />
           <div className="absolute bottom-8 left-0 right-0 text-center">
-            <p className="text-gray-400 text-sm">
+            <p className="text-zinc-400 text-sm">
               {showViewer.date && showViewer.date !== 'Unbekannt'
                 ? format(new Date(showViewer.date), 'd. MMMM yyyy', { locale: de })
                 : ''}
