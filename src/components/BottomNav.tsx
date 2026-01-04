@@ -6,9 +6,8 @@ import {
   LayoutDashboard,
   Scale,
   Utensils,
-  Ruler,
+  ClipboardList,
   Camera,
-  Calculator,
   Timer,
 } from 'lucide-react';
 
@@ -16,9 +15,8 @@ const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Home' },
   { href: '/weight', icon: Scale, label: 'Weight' },
   { href: '/calories', icon: Utensils, label: 'Food' },
-  { href: '/measurements', icon: Ruler, label: 'Body' },
+  { href: '/plan', icon: ClipboardList, label: 'Plan' },
   { href: '/photos', icon: Camera, label: 'Photos' },
-  { href: '/calculator', icon: Calculator, label: 'Calc' },
   { href: '/fasting', icon: Timer, label: 'Fast' },
 ];
 

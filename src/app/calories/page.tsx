@@ -202,13 +202,20 @@ export default function CaloriesPage() {
 
       {/* Quick Add Presets */}
       <div className="mt-4">
-        <p className="text-xs text-gray-400 mb-2">Quick add</p>
+        <div className="flex justify-between items-center mb-2">
+          <p className="text-xs text-gray-400">Quick add</p>
+          <a href="/plan" className="text-xs text-[#8b5cf6] hover:underline">
+            Meal Plan →
+          </a>
+        </div>
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
           {[
-            { name: 'Protein Shake', cal: 150, pro: 25 },
-            { name: 'Chicken Breast', cal: 165, pro: 31 },
-            { name: 'Greek Yogurt', cal: 100, pro: 17 },
-            { name: 'Eggs (2)', cal: 140, pro: 12 },
+            { name: 'Frühstück komplett', cal: 630, pro: 40 },
+            { name: 'Iglo Schlemmer + Kartoffeln', cal: 470, pro: 45 },
+            { name: 'Hähnchen + Gemüse', cal: 475, pro: 50 },
+            { name: 'Skyr (200g)', cal: 130, pro: 22 },
+            { name: '3 Eier', cal: 230, pro: 20 },
+            { name: 'Whey Shake', cal: 120, pro: 24 },
           ].map((preset) => (
             <button
               key={preset.name}
