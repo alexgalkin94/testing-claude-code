@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { format, subDays } from 'date-fns';
+import { format, subDays, addDays, isToday, isSameDay } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Check, ChevronDown, Scale, Flame, TrendingDown, ChevronRight } from 'lucide-react';
+import { Check, ChevronDown, Scale, Flame, TrendingDown, ChevronRight, ChevronLeft, Calendar } from 'lucide-react';
 import Card from '@/components/Card';
 import {
   DAY_A,
   DAY_B,
   DayPlan,
   MealItem,
+  Meal,
   getDayType,
   setDayType as saveDayType,
 } from '@/lib/mealPlan';
@@ -51,8 +52,10 @@ export default function TodayPage() {
   const [weights, setWeights] = useState<WeightEntry[]>([]);
   const [showWeightInput, setShowWeightInput] = useState(false);
   const [weightInput, setWeightInput] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
   const plan: DayPlan = dayType === 'A' ? DAY_A : DAY_B;
 
   useEffect(() => {
@@ -80,6 +83,7 @@ export default function TodayPage() {
     if (savedChecklist) {
       const allChecked: CheckedItems = JSON.parse(savedChecklist);
       setAllCheckedDays(allChecked);
+      const today = format(new Date(), 'yyyy-MM-dd');
       if (allChecked[today]) {
         setCheckedItems(new Set(allChecked[today]));
       }
@@ -104,26 +108,50 @@ export default function TodayPage() {
     } catch {}
   }, [profile, weights]);
 
+  // Load checklist when date or dayType changes
   useEffect(() => {
     if (!mounted) return;
     const savedChecklist = localStorage.getItem(CHECKLIST_KEY);
     if (savedChecklist) {
       const allChecked: CheckedItems = JSON.parse(savedChecklist);
-      setCheckedItems(new Set(allChecked[today] || []));
+      setCheckedItems(new Set(allChecked[selectedDateStr] || []));
+    } else {
+      setCheckedItems(new Set());
     }
-  }, [dayType, today, mounted]);
+  }, [dayType, selectedDateStr, mounted]);
+
+  const saveCheckedItems = (items: Set<string>) => {
+    const savedChecklist = localStorage.getItem(CHECKLIST_KEY);
+    const allChecked: CheckedItems = savedChecklist ? JSON.parse(savedChecklist) : {};
+    allChecked[selectedDateStr] = Array.from(items);
+    setAllCheckedDays(allChecked);
+    localStorage.setItem(CHECKLIST_KEY, JSON.stringify(allChecked));
+  };
 
   const handleToggle = (itemId: string) => {
     setCheckedItems(prev => {
       const next = new Set(prev);
       if (next.has(itemId)) next.delete(itemId);
       else next.add(itemId);
+      saveCheckedItems(next);
+      return next;
+    });
+  };
 
-      const savedChecklist = localStorage.getItem(CHECKLIST_KEY);
-      const allChecked: CheckedItems = savedChecklist ? JSON.parse(savedChecklist) : {};
-      allChecked[today] = Array.from(next);
-      setAllCheckedDays(allChecked);
-      localStorage.setItem(CHECKLIST_KEY, JSON.stringify(allChecked));
+  const handleToggleMeal = (meal: Meal) => {
+    const mealItemIds = meal.items.map(i => i.id);
+    const allChecked = mealItemIds.every(id => checkedItems.has(id));
+
+    setCheckedItems(prev => {
+      const next = new Set(prev);
+      if (allChecked) {
+        // Uncheck all
+        mealItemIds.forEach(id => next.delete(id));
+      } else {
+        // Check all
+        mealItemIds.forEach(id => next.add(id));
+      }
+      saveCheckedItems(next);
       return next;
     });
   };
@@ -146,8 +174,8 @@ export default function TodayPage() {
     const weight = parseFloat(weightInput);
     if (!weight || weight < 30 || weight > 300) return;
 
-    const newEntry = { date: today, weight };
-    const newWeights = [...weights.filter(w => w.date !== today), newEntry].sort(
+    const newEntry = { date: todayStr, weight };
+    const newWeights = [...weights.filter(w => w.date !== todayStr), newEntry].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
@@ -157,6 +185,20 @@ export default function TodayPage() {
     setShowWeightInput(false);
     setWeightInput('');
     syncToServer();
+  };
+
+  const goToPreviousDay = () => {
+    setSelectedDate(prev => subDays(prev, 1));
+  };
+
+  const goToNextDay = () => {
+    if (!isToday(selectedDate)) {
+      setSelectedDate(prev => addDays(prev, 1));
+    }
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date());
   };
 
   // Calculate streak
@@ -198,6 +240,8 @@ export default function TodayPage() {
     });
   });
 
+  const isViewingToday = isToday(selectedDate);
+
   if (!mounted) {
     return (
       <div className="p-4 space-y-4">
@@ -210,51 +254,82 @@ export default function TodayPage() {
 
   return (
     <div className="p-4 pb-24">
-      {/* Header */}
-      <div className="mb-6">
-        <p className="text-zinc-500 text-sm">
-          {format(new Date(), 'EEEE, d. MMMM', { locale: de })}
-        </p>
-        <h1 className="text-xl font-semibold tracking-tight">Heute</h1>
-      </div>
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        {/* Weight Card */}
+      {/* Date Selector */}
+      <div className="flex items-center justify-between mb-6">
         <button
-          onClick={() => setShowWeightInput(!showWeightInput)}
-          className="text-left"
+          onClick={goToPreviousDay}
+          className="p-2 rounded-lg hover:bg-zinc-800 transition-colors"
         >
-          <Card className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Scale size={14} className="text-zinc-500" />
-              <span className="text-xs text-zinc-500">Gewicht</span>
-            </div>
-            <p className="text-lg font-semibold">{profile.currentWeight}<span className="text-xs text-zinc-500 ml-0.5">kg</span></p>
-          </Card>
+          <ChevronLeft size={20} className="text-zinc-400" />
         </button>
 
-        {/* Loss Card */}
-        <Card className="p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingDown size={14} className="text-emerald-500" />
-            <span className="text-xs text-zinc-500">Verloren</span>
-          </div>
-          <p className="text-lg font-semibold text-emerald-500">-{totalLoss.toFixed(1)}<span className="text-xs ml-0.5">kg</span></p>
-        </Card>
+        <div className="text-center">
+          <button
+            onClick={goToToday}
+            className={`text-sm mb-0.5 ${isViewingToday ? 'text-zinc-500' : 'text-white underline'}`}
+            disabled={isViewingToday}
+          >
+            {isViewingToday ? (
+              <span className="text-zinc-500">{format(selectedDate, 'EEEE', { locale: de })}</span>
+            ) : (
+              'Heute'
+            )}
+          </button>
+          <h1 className="text-xl font-semibold tracking-tight">
+            {format(selectedDate, 'd. MMMM', { locale: de })}
+          </h1>
+        </div>
 
-        {/* Streak Card */}
-        <Card className="p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <Flame size={14} className={streak > 0 ? 'text-orange-500' : 'text-zinc-500'} />
-            <span className="text-xs text-zinc-500">Streak</span>
-          </div>
-          <p className="text-lg font-semibold">{streak}<span className="text-xs text-zinc-500 ml-0.5">Tage</span></p>
-        </Card>
+        <button
+          onClick={goToNextDay}
+          disabled={isViewingToday}
+          className={`p-2 rounded-lg transition-colors ${
+            isViewingToday ? 'opacity-30' : 'hover:bg-zinc-800'
+          }`}
+        >
+          <ChevronRight size={20} className="text-zinc-400" />
+        </button>
       </div>
 
+      {/* Stats Row - only show on today */}
+      {isViewingToday && (
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          {/* Weight Card */}
+          <button
+            onClick={() => setShowWeightInput(!showWeightInput)}
+            className="text-left"
+          >
+            <Card className="p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <Scale size={14} className="text-zinc-500" />
+                <span className="text-xs text-zinc-500">Gewicht</span>
+              </div>
+              <p className="text-lg font-semibold">{profile.currentWeight}<span className="text-xs text-zinc-500 ml-0.5">kg</span></p>
+            </Card>
+          </button>
+
+          {/* Loss Card */}
+          <Card className="p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingDown size={14} className="text-emerald-500" />
+              <span className="text-xs text-zinc-500">Verloren</span>
+            </div>
+            <p className="text-lg font-semibold text-emerald-500">-{totalLoss.toFixed(1)}<span className="text-xs ml-0.5">kg</span></p>
+          </Card>
+
+          {/* Streak Card */}
+          <Card className="p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Flame size={14} className={streak > 0 ? 'text-orange-500' : 'text-zinc-500'} />
+              <span className="text-xs text-zinc-500">Streak</span>
+            </div>
+            <p className="text-lg font-semibold">{streak}<span className="text-xs text-zinc-500 ml-0.5">Tage</span></p>
+          </Card>
+        </div>
+      )}
+
       {/* Quick Weight Input */}
-      {showWeightInput && (
+      {showWeightInput && isViewingToday && (
         <Card className="mb-4 p-3">
           <div className="flex gap-2">
             <input
@@ -276,19 +351,21 @@ export default function TodayPage() {
         </Card>
       )}
 
-      {/* Progress to Goal */}
-      <Card className="mb-6 p-4">
-        <div className="flex justify-between items-center mb-3">
-          <span className="text-sm text-zinc-400">Noch {remaining.toFixed(1)} kg zum Ziel</span>
-          <span className="text-xs text-zinc-500">{profile.goalWeight} kg</span>
-        </div>
-        <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-white rounded-full"
-            style={{ width: `${Math.min(100, (totalLoss / (profile.startWeight - profile.goalWeight)) * 100)}%` }}
-          />
-        </div>
-      </Card>
+      {/* Progress to Goal - only show on today */}
+      {isViewingToday && (
+        <Card className="mb-6 p-4">
+          <div className="flex justify-between items-center mb-3">
+            <span className="text-sm text-zinc-400">Noch {remaining.toFixed(1)} kg zum Ziel</span>
+            <span className="text-xs text-zinc-500">{profile.goalWeight} kg</span>
+          </div>
+          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-white rounded-full"
+              style={{ width: `${Math.min(100, (totalLoss / (profile.startWeight - profile.goalWeight)) * 100)}%` }}
+            />
+          </div>
+        </Card>
+      )}
 
       {/* Day Toggle */}
       <div className="flex gap-2 mb-4">
@@ -317,7 +394,9 @@ export default function TodayPage() {
       {/* Macros Summary */}
       <Card className="mb-4 p-4">
         <div className="flex justify-between items-center mb-3">
-          <span className="text-sm font-medium">Makros heute</span>
+          <span className="text-sm font-medium">
+            Makros {isViewingToday ? 'heute' : format(selectedDate, 'd.M.', { locale: de })}
+          </span>
           <span className="text-xs text-zinc-500">{completedCount}/{totalItems} Items</span>
         </div>
         <div className="grid grid-cols-4 gap-4">
@@ -349,32 +428,54 @@ export default function TodayPage() {
 
       {/* Meals */}
       <div className="space-y-3">
-        {plan.meals.map(meal => (
-          <Card key={meal.id} className="p-4">
-            <div className="flex justify-between items-center mb-3">
-              <div>
-                <h3 className="font-medium text-sm">{meal.name}</h3>
-                <p className="text-xs text-zinc-500">{meal.time}</p>
-              </div>
-              <span className="text-xs text-zinc-500">
-                {meal.items.filter(i => checkedItems.has(i.id)).length}/{meal.items.length}
-              </span>
-            </div>
+        {plan.meals.map(meal => {
+          const mealItemIds = meal.items.map(i => i.id);
+          const checkedCount = mealItemIds.filter(id => checkedItems.has(id)).length;
+          const allMealChecked = checkedCount === meal.items.length;
 
-            <div className="space-y-2">
-              {meal.items.map(item => (
-                <MealItemRow
-                  key={item.id}
-                  item={item}
-                  checked={checkedItems.has(item.id)}
-                  expanded={expandedItems.has(item.id)}
-                  onToggle={() => handleToggle(item.id)}
-                  onExpand={() => toggleExpanded(item.id)}
-                />
-              ))}
-            </div>
-          </Card>
-        ))}
+          return (
+            <Card key={meal.id} className="p-4">
+              <div className="flex items-center gap-3 mb-3">
+                {/* Meal Checkbox */}
+                <button
+                  onClick={() => handleToggleMeal(meal)}
+                  className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${
+                    allMealChecked
+                      ? 'bg-emerald-500 border-emerald-500 text-white'
+                      : checkedCount > 0
+                      ? 'bg-emerald-500/30 border-emerald-500/50'
+                      : 'bg-transparent border-zinc-700'
+                  }`}
+                >
+                  {allMealChecked && <Check size={12} strokeWidth={2.5} />}
+                </button>
+
+                <div className="flex-1">
+                  <h3 className={`font-medium text-sm ${allMealChecked ? 'text-zinc-500 line-through' : ''}`}>
+                    {meal.name}
+                  </h3>
+                  <p className="text-xs text-zinc-500">{meal.time}</p>
+                </div>
+                <span className="text-xs text-zinc-500">
+                  {checkedCount}/{meal.items.length}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {meal.items.map(item => (
+                  <MealItemRow
+                    key={item.id}
+                    item={item}
+                    checked={checkedItems.has(item.id)}
+                    expanded={expandedItems.has(item.id)}
+                    onToggle={() => handleToggle(item.id)}
+                    onExpand={() => toggleExpanded(item.id)}
+                  />
+                ))}
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
