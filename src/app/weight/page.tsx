@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import { de } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine } from 'recharts';
 import { Plus, TrendingDown } from 'lucide-react';
 import Card from '@/components/Card';
@@ -25,7 +26,7 @@ export default function WeightPage() {
   const loadData = () => {
     setWeights(getWeights());
     const settings = getSettings();
-    if (settings) {
+    if (settings?.goalWeight) {
       setGoalWeight(settings.goalWeight);
     }
   };
@@ -44,7 +45,7 @@ export default function WeightPage() {
 
   const movingAvg = getMovingAverage(weights);
   const chartData = weights.map((w, i) => ({
-    date: format(new Date(w.date), 'M/d'),
+    date: format(new Date(w.date), 'd.M.'),
     weight: w.weight,
     avg: movingAvg[i]?.avg,
   }));
@@ -57,11 +58,11 @@ export default function WeightPage() {
     <div className="p-4">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Weight</h1>
-          <p className="text-gray-400 text-sm">Track your progress</p>
+          <h1 className="text-2xl font-bold">Gewicht</h1>
+          <p className="text-gray-400 text-sm">Verfolge deinen Fortschritt</p>
         </div>
         <Button onClick={() => setShowForm(!showForm)} size="sm">
-          <Plus size={18} className="mr-1" /> Log
+          <Plus size={18} className="mr-1" /> Eintragen
         </Button>
       </div>
 
@@ -69,23 +70,23 @@ export default function WeightPage() {
         <Card className="mb-4" glow>
           <div className="space-y-4">
             <Input
-              label="Date"
+              label="Datum"
               type="date"
               value={selectedDate}
               onChange={setSelectedDate}
             />
             <Input
-              label="Weight"
+              label="Gewicht"
               type="number"
               value={newWeight}
               onChange={setNewWeight}
-              placeholder="185.5"
-              suffix="lbs"
+              placeholder="85.5"
+              suffix="kg"
               step={0.1}
             />
             <div className="flex gap-2">
-              <Button onClick={handleSubmit} className="flex-1">Save</Button>
-              <Button onClick={() => setShowForm(false)} variant="secondary">Cancel</Button>
+              <Button onClick={handleSubmit} className="flex-1">Speichern</Button>
+              <Button onClick={() => setShowForm(false)} variant="secondary">Abbrechen</Button>
             </div>
           </div>
         </Card>
@@ -94,15 +95,15 @@ export default function WeightPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         <Card>
-          <p className="text-xs text-gray-400">Current</p>
-          <p className="text-lg font-bold">{latestWeight || '--'}</p>
+          <p className="text-xs text-gray-400">Aktuell</p>
+          <p className="text-lg font-bold">{latestWeight || '--'} <span className="text-xs text-gray-400">kg</span></p>
         </Card>
         <Card>
-          <p className="text-xs text-gray-400">Goal</p>
-          <p className="text-lg font-bold">{goalWeight || '--'}</p>
+          <p className="text-xs text-gray-400">Ziel</p>
+          <p className="text-lg font-bold">{goalWeight || '--'} <span className="text-xs text-gray-400">kg</span></p>
         </Card>
         <Card>
-          <p className="text-xs text-gray-400">Lost</p>
+          <p className="text-xs text-gray-400">Verloren</p>
           <p className="text-lg font-bold text-[#10b981]">
             {totalChange > 0 ? `-${totalChange.toFixed(1)}` : '--'}
           </p>
@@ -111,7 +112,7 @@ export default function WeightPage() {
 
       {/* Chart */}
       <Card className="mb-4">
-        <h3 className="text-sm font-medium text-gray-400 mb-4">Weight Trend</h3>
+        <h3 className="text-sm font-medium text-gray-400 mb-4">Gewichtsverlauf</h3>
         {chartData.length > 0 ? (
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
@@ -135,13 +136,14 @@ export default function WeightPage() {
                     borderRadius: '8px',
                   }}
                   labelStyle={{ color: '#9ca3af' }}
+                  formatter={(value) => value != null ? [`${value} kg`, ''] : ['', '']}
                 />
                 {goalWeight && (
                   <ReferenceLine
                     y={goalWeight}
                     stroke="#8b5cf6"
                     strokeDasharray="5 5"
-                    label={{ value: 'Goal', fill: '#8b5cf6', fontSize: 10 }}
+                    label={{ value: 'Ziel', fill: '#8b5cf6', fontSize: 10 }}
                   />
                 )}
                 <Line
@@ -157,7 +159,7 @@ export default function WeightPage() {
                   stroke="#10b981"
                   strokeWidth={2}
                   dot={false}
-                  name="7-day avg"
+                  name="7-Tage Ø"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -166,7 +168,7 @@ export default function WeightPage() {
           <div className="h-48 flex items-center justify-center text-gray-500">
             <div className="text-center">
               <TrendingDown size={32} className="mx-auto mb-2 opacity-50" />
-              <p>No data yet. Log your first weigh-in!</p>
+              <p>Noch keine Daten. Trag dein erstes Gewicht ein!</p>
             </div>
           </div>
         )}
@@ -174,18 +176,18 @@ export default function WeightPage() {
 
       {/* History */}
       <Card>
-        <h3 className="text-sm font-medium text-gray-400 mb-3">History</h3>
+        <h3 className="text-sm font-medium text-gray-400 mb-3">Verlauf</h3>
         <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
           {[...weights].reverse().slice(0, 10).map((entry, i) => (
             <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
               <span className="text-gray-400 text-sm">
-                {format(new Date(entry.date), 'MMM d, yyyy')}
+                {format(new Date(entry.date), 'd. MMM yyyy', { locale: de })}
               </span>
-              <span className="font-medium">{entry.weight} lbs</span>
+              <span className="font-medium">{entry.weight} kg</span>
             </div>
           ))}
           {weights.length === 0 && (
-            <p className="text-gray-500 text-center py-4">No entries yet</p>
+            <p className="text-gray-500 text-center py-4">Noch keine Einträge</p>
           )}
         </div>
       </Card>
