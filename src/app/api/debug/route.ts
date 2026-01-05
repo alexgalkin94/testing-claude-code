@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@libsql/client';
+import { list } from '@vercel/blob';
 
 export async function GET() {
   const checks: Record<string, any> = {
@@ -7,10 +8,12 @@ export async function GET() {
       TURSO_DATABASE_URL: !!process.env.TURSO_DATABASE_URL,
       TURSO_AUTH_TOKEN: !!process.env.TURSO_AUTH_TOKEN,
       BETTER_AUTH_SECRET: !!process.env.BETTER_AUTH_SECRET,
+      BLOB_READ_WRITE_TOKEN: !!process.env.BLOB_READ_WRITE_TOKEN,
       NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'NOT SET',
     },
     database: null,
     tables: null,
+    blobStorage: null,
   };
 
   const url = process.env.TURSO_DATABASE_URL;
@@ -44,6 +47,15 @@ export async function GET() {
 
   } catch (error) {
     checks.database = `Error: ${String(error)}`;
+  }
+
+  // Check Blob storage
+  try {
+    const { blobs } = await list({ prefix: 'users/', limit: 5 });
+    checks.blobStorage = `OK - ${blobs.length} files found`;
+    checks.blobFiles = blobs.map(b => b.pathname);
+  } catch (error) {
+    checks.blobStorage = `Error: ${String(error)}`;
   }
 
   return NextResponse.json(checks, { status: 200 });
