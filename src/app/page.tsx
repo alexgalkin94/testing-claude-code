@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { format, subDays, addDays, isToday, differenceInDays } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Check, ChevronDown, Scale, Flame, TrendingDown, TrendingUp, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff, Pencil, Target } from 'lucide-react';
+import { Check, ChevronDown, Scale, Flame, TrendingDown, TrendingUp, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff, Pencil, Target, Plus, Zap } from 'lucide-react';
 import Card from '@/components/Card';
 import { useData } from '@/lib/data-store';
 import {
@@ -25,16 +25,21 @@ const MealIcon = ({ icon, className, size = 16 }: { icon: 'sunrise' | 'sun' | 's
 };
 
 export default function TodayPage() {
-  const { data, isLoading, isSyncing, lastSyncError, toggleChecklistItem, setChecklistItems, setDayType, addWeight } = useData();
+  const { data, isLoading, isSyncing, lastSyncError, toggleChecklistItem, setChecklistItems, setExtraCalories, setDayType, addWeight } = useData();
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [showWeightInput, setShowWeightInput] = useState(false);
   const [weightInput, setWeightInput] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showExtraInput, setShowExtraInput] = useState(false);
+  const [extraInput, setExtraInput] = useState('');
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const plan: DayPlan = data.dayType === 'A' ? DAY_A : DAY_B;
+
+  // Get extra calories for selected date
+  const extraCalories = data.extraCalories?.[selectedDateStr] || 0;
 
   // Get checked items for selected date
   const checkedItems = useMemo(() => {
@@ -82,6 +87,14 @@ export default function TodayPage() {
     setWeightInput('');
   };
 
+  const handleExtraCalories = () => {
+    const extra = parseInt(extraInput);
+    if (isNaN(extra)) return;
+    setExtraCalories(selectedDateStr, extra);
+    setShowExtraInput(false);
+    setExtraInput('');
+  };
+
   const goToPreviousDay = () => setSelectedDate(prev => subDays(prev, 1));
   const goToNextDay = () => { if (!isToday(selectedDate)) setSelectedDate(prev => addDays(prev, 1)); };
   const goToToday = () => setSelectedDate(new Date());
@@ -123,34 +136,98 @@ export default function TodayPage() {
     return result;
   }, [plan.meals, checkedItems]);
 
-  // Smart progress tracking
+  // Total calories including extras
+  const totalConsumedCalories = consumed.calories + extraCalories;
+
+  // Smart progress tracking with rolling averages and adaptive TDEE
   const progressTracking = useMemo(() => {
     const startDate = new Date(data.profile.startDate);
     const today = new Date();
     const daysElapsed = differenceInDays(today, startDate);
 
+    // Sort weights by date
+    const sortedWeights = [...data.weights].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // Calculate 7-day rolling average for current weight
+    const recentWeights = sortedWeights.slice(-7);
+    const rollingAvgWeight = recentWeights.length > 0
+      ? recentWeights.reduce((sum, w) => sum + w.weight, 0) / recentWeights.length
+      : data.profile.currentWeight;
+
+    // Calculate 7-day rolling average from 7-14 days ago for trend
+    const olderWeights = sortedWeights.slice(-14, -7);
+    const olderAvgWeight = olderWeights.length > 0
+      ? olderWeights.reduce((sum, w) => sum + w.weight, 0) / olderWeights.length
+      : null;
+
+    // Weekly trend based on rolling averages (more stable)
+    const weeklyTrend = olderAvgWeight !== null && recentWeights.length >= 3
+      ? olderAvgWeight - rollingAvgWeight
+      : null;
+
     const totalToLose = data.profile.startWeight - data.profile.goalWeight;
-    const actualLoss = data.profile.startWeight - data.profile.currentWeight;
+    const actualLoss = data.profile.startWeight - rollingAvgWeight;
 
     // Calculate expected loss rate from calorie deficit
     // 1kg body fat ≈ 7700 kcal
     const dailyDeficit = data.profile.tdee - data.profile.calorieTarget;
-    const expectedLossPerDay = dailyDeficit / 7700; // kg per day
+    const expectedLossPerDay = dailyDeficit / 7700;
     const expectedLossPerWeek = expectedLossPerDay * 7;
 
     const expectedLoss = daysElapsed * expectedLossPerDay;
     const expectedWeight = data.profile.startWeight - expectedLoss;
 
-    // Difference: positive = ahead, negative = behind
-    const difference = expectedWeight - data.profile.currentWeight;
+    // Difference based on rolling average (more stable)
+    const difference = expectedWeight - rollingAvgWeight;
     const isAhead = difference > 0;
 
-    // Actual rate (kg per day)
-    const actualRatePerDay = daysElapsed > 0 ? actualLoss / daysElapsed : 0;
-    const actualRatePerWeek = actualRatePerDay * 7;
+    // Actual rate based on rolling average trend OR overall progress
+    const actualRatePerWeek = weeklyTrend !== null
+      ? weeklyTrend // Use trend between rolling averages
+      : (daysElapsed > 0 ? (actualLoss / daysElapsed) * 7 : 0);
+
+    // Calculate adaptive TDEE from real data (need 14+ days and weight tracking)
+    // Formula: actual_tdee = avg_calories_consumed + (weight_lost_per_week * 7700 / 7)
+    let calculatedTdee: number | null = null;
+    if (sortedWeights.length >= 7 && daysElapsed >= 14) {
+      // Calculate average daily calories consumed over last 14 days
+      let totalCaloriesConsumed = 0;
+      let daysWithData = 0;
+
+      for (let i = 0; i < 14; i++) {
+        const dateStr = format(subDays(today, i), 'yyyy-MM-dd');
+        const checkedItems = data.checklist[dateStr] || [];
+        const extraCals = data.extraCalories?.[dateStr] || 0;
+
+        // Calculate calories from checked items
+        let dayCalories = extraCals;
+        plan.meals.forEach(meal => {
+          meal.items.forEach(item => {
+            if (checkedItems.includes(item.id)) {
+              dayCalories += item.calories;
+            }
+          });
+        });
+
+        if (checkedItems.length > 0 || extraCals > 0) {
+          totalCaloriesConsumed += dayCalories;
+          daysWithData++;
+        }
+      }
+
+      // Only calculate if we have enough days with calorie data
+      if (daysWithData >= 7 && weeklyTrend !== null && weeklyTrend > 0) {
+        const avgDailyCalories = totalCaloriesConsumed / daysWithData;
+        const dailyDeficitFromWeight = (weeklyTrend * 7700) / 7;
+        calculatedTdee = Math.round(avgDailyCalories + dailyDeficitFromWeight);
+      }
+    }
 
     // Projected days to goal based on actual rate
-    const remainingToLose = data.profile.currentWeight - data.profile.goalWeight;
+    const remainingToLose = rollingAvgWeight - data.profile.goalWeight;
+    const actualRatePerDay = actualRatePerWeek / 7;
     const projectedDaysRemaining = actualRatePerDay > 0 ? remainingToLose / actualRatePerDay : Infinity;
     const projectedDate = actualRatePerDay > 0
       ? addDays(today, Math.ceil(projectedDaysRemaining))
@@ -170,8 +247,11 @@ export default function TodayPage() {
       projectedDate,
       expectedDate,
       remainingToLose,
+      rollingAvgWeight,
+      calculatedTdee,
+      hasEnoughData: sortedWeights.length >= 7,
     };
-  }, [data.profile]);
+  }, [data.profile, data.weights, data.checklist, data.extraCalories, plan.meals]);
 
   const isViewingToday = isToday(selectedDate);
 
@@ -425,6 +505,31 @@ export default function TodayPage() {
                   </div>
                   <p className="text-sm text-zinc-500">Noch {remaining.toFixed(1)} kg</p>
                 </Card>
+
+                {/* Calculated TDEE */}
+                <Card className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap size={16} className="text-yellow-500" />
+                    <span className="text-sm text-zinc-400">Berechneter TDEE</span>
+                  </div>
+                  {progressTracking.calculatedTdee ? (
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-2xl font-semibold text-yellow-500">
+                        {progressTracking.calculatedTdee}
+                      </p>
+                      <span className="text-sm text-zinc-500">kcal</span>
+                      <span className="text-xs text-zinc-600 ml-2">
+                        (Annahme: {data.profile.tdee})
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-zinc-600">
+                      {!progressTracking.hasEnoughData
+                        ? `Noch ${7 - data.weights.length} Gewichtseinträge nötig`
+                        : 'Noch ~14 Tage Tracking nötig'}
+                    </p>
+                  )}
+                </Card>
               </div>
 
               {/* Mobile Progress Bar */}
@@ -491,10 +596,54 @@ export default function TodayPage() {
                 <span className="text-sm text-zinc-500">{completedCount}/{totalItems}</span>
               </div>
               <div className="space-y-3">
-                <MacroBar label="Kalorien" current={consumed.calories} total={plan.totals.calories} unit="kcal" />
+                <MacroBar label="Kalorien" current={totalConsumedCalories} total={plan.totals.calories} unit="kcal" extra={extraCalories} />
                 <MacroBar label="Protein" current={consumed.protein} total={plan.totals.protein} unit="g" color="emerald" />
                 <MacroBar label="Carbs" current={consumed.carbs} total={plan.totals.carbs} unit="g" color="blue" />
                 <MacroBar label="Fett" current={consumed.fat} total={plan.totals.fat} unit="g" color="orange" />
+              </div>
+              {/* Extra Calories Input */}
+              <div className="mt-4 pt-4 border-t border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-zinc-400">Extra Kalorien</span>
+                  {showExtraInput ? (
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={extraInput}
+                        onChange={(e) => setExtraInput(e.target.value)}
+                        placeholder="0"
+                        className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-right"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleExtraCalories();
+                          if (e.key === 'Escape') { setShowExtraInput(false); setExtraInput(''); }
+                        }}
+                      />
+                      <span className="text-zinc-500 text-sm">kcal</span>
+                      <button
+                        onClick={handleExtraCalories}
+                        className="bg-white text-black px-3 py-1.5 rounded-lg text-sm font-medium"
+                      >
+                        OK
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setShowExtraInput(true); setExtraInput(extraCalories > 0 ? extraCalories.toString() : ''); }}
+                      className="flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200"
+                    >
+                      {extraCalories > 0 ? (
+                        <span className="text-orange-500 font-medium">+{extraCalories} kcal</span>
+                      ) : (
+                        <>
+                          <Plus size={16} />
+                          <span>Hinzufügen</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             </Card>
           </div>
@@ -537,7 +686,7 @@ export default function TodayPage() {
             <div className="grid grid-cols-4 gap-3">
               <div>
                 <p className="text-[10px] text-zinc-500 mb-0.5">kcal</p>
-                <p className="text-base font-semibold">{consumed.calories}</p>
+                <p className="text-base font-semibold">{totalConsumedCalories}</p>
                 <p className="text-[10px] text-zinc-600">/{plan.totals.calories}</p>
               </div>
               <div>
@@ -556,7 +705,50 @@ export default function TodayPage() {
                 <p className="text-[10px] text-zinc-600">/{plan.totals.fat}g</p>
               </div>
             </div>
-            <div className="h-1 bg-zinc-800 rounded-full overflow-hidden mt-4">
+            {/* Extra Calories */}
+            <div className="mt-3 pt-3 border-t border-zinc-800">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-500">Extra kcal</span>
+                {showExtraInput ? (
+                  <div className="flex gap-1.5">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={extraInput}
+                      onChange={(e) => setExtraInput(e.target.value)}
+                      placeholder="0"
+                      className="w-16 bg-zinc-800 border border-zinc-700 rounded px-2 py-0.5 text-xs text-right"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleExtraCalories();
+                        if (e.key === 'Escape') { setShowExtraInput(false); setExtraInput(''); }
+                      }}
+                    />
+                    <button
+                      onClick={handleExtraCalories}
+                      className="bg-white text-black px-2 py-0.5 rounded text-xs font-medium"
+                    >
+                      OK
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setShowExtraInput(true); setExtraInput(extraCalories.toString()); }}
+                    className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200"
+                  >
+                    {extraCalories > 0 ? (
+                      <span className="text-orange-500">+{extraCalories}</span>
+                    ) : (
+                      <>
+                        <Plus size={12} />
+                        <span>Hinzufügen</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="h-1 bg-zinc-800 rounded-full overflow-hidden mt-3">
               <div
                 className="h-full bg-emerald-500 rounded-full transition-all duration-300"
                 style={{ width: `${progressPercent}%` }}
@@ -639,12 +831,13 @@ export default function TodayPage() {
   );
 }
 
-function MacroBar({ label, current, total, unit, color = 'white' }: {
+function MacroBar({ label, current, total, unit, color = 'white', extra = 0 }: {
   label: string;
   current: number;
   total: number;
   unit: string;
   color?: 'white' | 'emerald' | 'blue' | 'orange';
+  extra?: number;
 }) {
   const percent = Math.min(100, (current / total) * 100);
   const bgColors = {
@@ -658,7 +851,11 @@ function MacroBar({ label, current, total, unit, color = 'white' }: {
     <div>
       <div className="flex justify-between text-sm mb-1">
         <span className="text-zinc-400">{label}</span>
-        <span>{current} / {total} {unit}</span>
+        <span>
+          {current}
+          {extra > 0 && <span className="text-orange-500 text-xs ml-1">(+{extra})</span>}
+          {' '}/ {total} {unit}
+        </span>
       </div>
       <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
         <div

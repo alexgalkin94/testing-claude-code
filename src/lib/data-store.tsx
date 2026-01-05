@@ -14,6 +14,7 @@ export interface AppData {
     calorieTarget: number;
     proteinTarget: number;
     tdee: number;
+    calculatedTdee?: number; // Calculated from real data
   };
   // Weights
   weights: Array<{
@@ -23,6 +24,10 @@ export interface AppData {
   // Checklist (items checked per day)
   checklist: {
     [date: string]: string[];
+  };
+  // Extra calories per day (snacks, cheat meals, etc.)
+  extraCalories: {
+    [date: string]: number;
   };
   // Current day type
   dayType: 'A' | 'B';
@@ -43,6 +48,7 @@ const DEFAULT_DATA: AppData = {
   },
   weights: [],
   checklist: {},
+  extraCalories: {},
   dayType: 'A',
 };
 
@@ -57,6 +63,7 @@ interface DataContextType {
   addWeight: (date: string, weight: number) => void;
   toggleChecklistItem: (date: string, itemId: string) => void;
   setChecklistItems: (date: string, items: string[]) => void;
+  setExtraCalories: (date: string, calories: number) => void;
   setDayType: (type: 'A' | 'B') => void;
   forceSync: () => Promise<void>;
 }
@@ -245,6 +252,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }));
   }, [updateData]);
 
+  // Set extra calories for a day
+  const setExtraCalories = useCallback((date: string, calories: number) => {
+    updateData(prev => ({
+      ...prev,
+      extraCalories: { ...prev.extraCalories, [date]: calories },
+    }));
+  }, [updateData]);
+
   // Set day type
   const setDayType = useCallback((type: 'A' | 'B') => {
     updateData(prev => ({ ...prev, dayType: type }));
@@ -265,6 +280,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addWeight,
       toggleChecklistItem,
       setChecklistItems,
+      setExtraCalories,
       setDayType,
       forceSync,
     }}>
