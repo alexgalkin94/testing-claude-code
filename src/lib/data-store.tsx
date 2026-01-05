@@ -75,6 +75,52 @@ export function DataProvider({ children }: { children: ReactNode }) {
     loadData();
   }, []);
 
+  // Refresh from server when tab becomes visible or window gets focus
+  useEffect(() => {
+    const refreshFromServer = async () => {
+      if (!initialized) return;
+
+      try {
+        const response = await fetch('/api/sync');
+        if (response.ok) {
+          const serverData = await response.json();
+          if (serverData && serverData.lastSync) {
+            // Only update if server has newer data
+            const localLastSync = data.lastSync;
+            if (!localLastSync || serverData.lastSync > localLastSync) {
+              const merged = { ...DEFAULT_DATA, ...serverData };
+              setData(merged);
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+              console.log('Refreshed from server:', serverData.lastSync);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Background refresh failed:', e);
+      }
+    };
+
+    // Refresh when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshFromServer();
+      }
+    };
+
+    // Refresh when window gets focus
+    const handleFocus = () => {
+      refreshFromServer();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [initialized, data.lastSync]);
+
   const loadData = async () => {
     setIsLoading(true);
 
