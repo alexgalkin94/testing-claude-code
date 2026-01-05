@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import AuthGuard from './AuthGuard';
 import BottomNav from './BottomNav';
 import Sidebar from './Sidebar';
+import { DataProvider } from '@/lib/data-store';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -15,23 +16,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthGuard>
-      {/* Desktop Layout */}
-      <div className="hidden lg:flex min-h-screen">
-        <Sidebar />
-        <main className="flex-1 ml-56">
-          <div className="max-w-5xl mx-auto">
-            {children}
-          </div>
-        </main>
-      </div>
+      <DataProvider>
+        {/* Desktop Layout */}
+        <div className="hidden lg:flex min-h-screen">
+          <Sidebar />
+          <main className="flex-1 ml-56">
+            <div className="max-w-5xl mx-auto">
+              {children}
+            </div>
+          </main>
+        </div>
 
-      {/* Mobile Layout */}
-      <div className="lg:hidden">
-        <main className="min-h-screen pb-20 max-w-lg mx-auto">
-          {children}
-        </main>
-        <BottomNav />
-      </div>
+        {/* Mobile Layout */}
+        <div className="lg:hidden">
+          <main className="min-h-screen pb-20 max-w-lg mx-auto">
+            {children}
+          </main>
+          <BottomNav />
+        </div>
+      </DataProvider>
     </AuthGuard>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine } from 'recharts';
@@ -8,40 +8,39 @@ import { Plus, TrendingDown } from 'lucide-react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
-import { getWeights, addWeight, getSettings, getMovingAverage, WeightEntry } from '@/lib/storage';
+import { useData } from '@/lib/data-store';
+
+// Calculate 7-day moving average for weights
+function getMovingAverage(weights: Array<{ date: string; weight: number }>, days: number = 7): { date: string; avg: number }[] {
+  if (weights.length === 0) return [];
+
+  return weights.map((entry, index) => {
+    const start = Math.max(0, index - days + 1);
+    const slice = weights.slice(start, index + 1);
+    const avg = slice.reduce((sum, w) => sum + w.weight, 0) / slice.length;
+    return { date: entry.date, avg: Math.round(avg * 10) / 10 };
+  });
+}
 
 export default function WeightPage() {
-  const [weights, setWeights] = useState<WeightEntry[]>([]);
+  const { data, isLoading, addWeight } = useData();
   const [showForm, setShowForm] = useState(false);
   const [newWeight, setNewWeight] = useState('');
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [goalWeight, setGoalWeight] = useState<number | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    loadData();
-  }, []);
-
-  const loadData = () => {
-    setWeights(getWeights());
-    const settings = getSettings();
-    if (settings) {
-      setGoalWeight(settings.goalWeight);
-    }
-  };
 
   const handleSubmit = () => {
     if (!newWeight) return;
-    addWeight({ date: selectedDate, weight: parseFloat(newWeight) });
+    addWeight(selectedDate, parseFloat(newWeight));
     setNewWeight('');
     setShowForm(false);
-    loadData();
   };
 
-  if (!mounted) {
+  if (isLoading) {
     return <div className="p-4 animate-pulse"><div className="h-64 bg-zinc-900 rounded-xl"></div></div>;
   }
+
+  const weights = data.weights;
+  const goalWeight = data.profile.goalWeight;
 
   const movingAvg = getMovingAverage(weights);
   const chartData = weights.map((w, i) => ({

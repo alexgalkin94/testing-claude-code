@@ -1,46 +1,18 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { format, subDays, addDays, isToday } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Check, ChevronDown, Scale, Flame, TrendingDown, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie } from 'lucide-react';
+import { Check, ChevronDown, Scale, Flame, TrendingDown, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff } from 'lucide-react';
 import Card from '@/components/Card';
+import { useData } from '@/lib/data-store';
 import {
   DAY_A,
   DAY_B,
   DayPlan,
   MealItem,
   Meal,
-  getDayType,
-  setDayType as saveDayType,
 } from '@/lib/mealPlan';
-
-const CHECKLIST_KEY = 'cutboard_checklist';
-const WEIGHTS_KEY = 'cutboard_weights';
-const PROFILE_KEY = 'cutboard_profile';
-
-interface CheckedItems {
-  [date: string]: string[];
-}
-
-interface WeightEntry {
-  date: string;
-  weight: number;
-}
-
-interface Profile {
-  startWeight: number;
-  currentWeight: number;
-  goalWeight: number;
-  startDate: string;
-}
-
-const DEFAULT_PROFILE: Profile = {
-  startWeight: 90,
-  currentWeight: 90,
-  goalWeight: 82,
-  startDate: '2024-12-01',
-};
 
 const MealIcon = ({ icon, className, size = 16 }: { icon: 'sunrise' | 'sun' | 'sunset' | 'cookie'; className?: string; size?: number }) => {
   const iconProps = { size, className };
@@ -53,119 +25,44 @@ const MealIcon = ({ icon, className, size = 16 }: { icon: 'sunrise' | 'sun' | 's
 };
 
 export default function TodayPage() {
-  const [dayType, setDayTypeState] = useState<'A' | 'B'>('A');
-  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
-  const [allCheckedDays, setAllCheckedDays] = useState<CheckedItems>({});
-  const [mounted, setMounted] = useState(false);
+  const { data, isLoading, isSyncing, lastSyncError, toggleChecklistItem, setChecklistItems, setDayType, addWeight } = useData();
+
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
-  const [weights, setWeights] = useState<WeightEntry[]>([]);
   const [showWeightInput, setShowWeightInput] = useState(false);
   const [weightInput, setWeightInput] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const plan: DayPlan = dayType === 'A' ? DAY_A : DAY_B;
+  const plan: DayPlan = data.dayType === 'A' ? DAY_A : DAY_B;
 
-  useEffect(() => {
-    setMounted(true);
-    loadAllData();
-  }, []);
-
-  const loadAllData = () => {
-    const savedType = getDayType();
-    setDayTypeState(savedType);
-
-    const savedProfile = localStorage.getItem(PROFILE_KEY);
-    if (savedProfile) setProfile(JSON.parse(savedProfile));
-
-    const savedWeights = localStorage.getItem(WEIGHTS_KEY);
-    if (savedWeights) {
-      const w = JSON.parse(savedWeights) as WeightEntry[];
-      setWeights(w);
-      if (w.length > 0) {
-        setProfile(prev => ({ ...prev, currentWeight: w[w.length - 1].weight }));
-      }
-    }
-
-    const savedChecklist = localStorage.getItem(CHECKLIST_KEY);
-    if (savedChecklist) {
-      const allChecked: CheckedItems = JSON.parse(savedChecklist);
-      setAllCheckedDays(allChecked);
-      const today = format(new Date(), 'yyyy-MM-dd');
-      if (allChecked[today]) {
-        setCheckedItems(new Set(allChecked[today]));
-      }
-    }
-
-    syncFromServer();
-  };
-
-  const syncFromServer = async () => {
-    try {
-      await fetch('/api/sync');
-    } catch {}
-  };
-
-  const syncToServer = useCallback(async () => {
-    try {
-      await fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, weights, lastSync: new Date().toISOString() }),
-      });
-    } catch {}
-  }, [profile, weights]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    const savedChecklist = localStorage.getItem(CHECKLIST_KEY);
-    if (savedChecklist) {
-      const allChecked: CheckedItems = JSON.parse(savedChecklist);
-      setCheckedItems(new Set(allChecked[selectedDateStr] || []));
-    } else {
-      setCheckedItems(new Set());
-    }
-  }, [dayType, selectedDateStr, mounted]);
-
-  const saveCheckedItems = (items: Set<string>) => {
-    const savedChecklist = localStorage.getItem(CHECKLIST_KEY);
-    const allChecked: CheckedItems = savedChecklist ? JSON.parse(savedChecklist) : {};
-    allChecked[selectedDateStr] = Array.from(items);
-    setAllCheckedDays(allChecked);
-    localStorage.setItem(CHECKLIST_KEY, JSON.stringify(allChecked));
-  };
+  // Get checked items for selected date
+  const checkedItems = useMemo(() => {
+    return new Set(data.checklist[selectedDateStr] || []);
+  }, [data.checklist, selectedDateStr]);
 
   const handleToggle = (itemId: string) => {
-    setCheckedItems(prev => {
-      const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
-      saveCheckedItems(next);
-      return next;
-    });
+    toggleChecklistItem(selectedDateStr, itemId);
   };
 
   const handleToggleMeal = (meal: Meal) => {
     const mealItemIds = meal.items.map(i => i.id);
-    const allChecked = mealItemIds.every(id => checkedItems.has(id));
+    const currentItems = data.checklist[selectedDateStr] || [];
+    const allChecked = mealItemIds.every(id => currentItems.includes(id));
 
-    setCheckedItems(prev => {
-      const next = new Set(prev);
-      if (allChecked) {
-        mealItemIds.forEach(id => next.delete(id));
-      } else {
-        mealItemIds.forEach(id => next.add(id));
-      }
-      saveCheckedItems(next);
-      return next;
-    });
+    if (allChecked) {
+      // Uncheck all meal items
+      const newItems = currentItems.filter(id => !mealItemIds.includes(id));
+      setChecklistItems(selectedDateStr, newItems);
+    } else {
+      // Check all meal items
+      const newItems = [...new Set([...currentItems, ...mealItemIds])];
+      setChecklistItems(selectedDateStr, newItems);
+    }
   };
 
   const handleDayChange = (type: 'A' | 'B') => {
-    setDayTypeState(type);
-    saveDayType(type);
+    setDayType(type);
   };
 
   const toggleExpanded = (itemId: string) => {
@@ -180,61 +77,55 @@ export default function TodayPage() {
   const handleQuickWeight = () => {
     const weight = parseFloat(weightInput);
     if (!weight || weight < 30 || weight > 300) return;
-
-    const newEntry = { date: todayStr, weight };
-    const newWeights = [...weights.filter(w => w.date !== todayStr), newEntry].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-
-    setWeights(newWeights);
-    setProfile(prev => ({ ...prev, currentWeight: weight }));
-    localStorage.setItem(WEIGHTS_KEY, JSON.stringify(newWeights));
+    addWeight(todayStr, weight);
     setShowWeightInput(false);
     setWeightInput('');
-    syncToServer();
   };
 
   const goToPreviousDay = () => setSelectedDate(prev => subDays(prev, 1));
   const goToNextDay = () => { if (!isToday(selectedDate)) setSelectedDate(prev => addDays(prev, 1)); };
   const goToToday = () => setSelectedDate(new Date());
 
-  const calculateStreak = () => {
-    let streak = 0;
+  // Calculate streak
+  const streak = useMemo(() => {
+    let count = 0;
     const totalItemsNeeded = plan.meals.reduce((sum, meal) => sum + meal.items.length, 0);
     for (let i = 0; i < 365; i++) {
       const date = format(subDays(new Date(), i), 'yyyy-MM-dd');
-      const dayChecked = allCheckedDays[date] || [];
+      const dayChecked = data.checklist[date] || [];
       if (dayChecked.length >= totalItemsNeeded * 0.8) {
-        streak++;
+        count++;
       } else if (i > 0) {
         break;
       }
     }
-    return streak;
-  };
+    return count;
+  }, [data.checklist, plan.meals]);
 
-  const streak = calculateStreak();
   const completedCount = checkedItems.size;
   const totalItems = plan.meals.reduce((sum, meal) => sum + meal.items.length, 0);
   const progressPercent = totalItems > 0 ? (completedCount / totalItems) * 100 : 0;
-  const totalLoss = profile.startWeight - profile.currentWeight;
-  const remaining = profile.currentWeight - profile.goalWeight;
+  const totalLoss = data.profile.startWeight - data.profile.currentWeight;
+  const remaining = data.profile.currentWeight - data.profile.goalWeight;
 
-  const consumed = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-  plan.meals.forEach(meal => {
-    meal.items.forEach(item => {
-      if (checkedItems.has(item.id)) {
-        consumed.calories += item.calories;
-        consumed.protein += item.protein;
-        consumed.carbs += item.carbs;
-        consumed.fat += item.fat;
-      }
+  const consumed = useMemo(() => {
+    const result = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    plan.meals.forEach(meal => {
+      meal.items.forEach(item => {
+        if (checkedItems.has(item.id)) {
+          result.calories += item.calories;
+          result.protein += item.protein;
+          result.carbs += item.carbs;
+          result.fat += item.fat;
+        }
+      });
     });
-  });
+    return result;
+  }, [plan.meals, checkedItems]);
 
   const isViewingToday = isToday(selectedDate);
 
-  if (!mounted) {
+  if (isLoading) {
     return (
       <div className="p-4 lg:p-8 space-y-4">
         {[1, 2, 3].map(i => (
@@ -246,6 +137,17 @@ export default function TodayPage() {
 
   return (
     <div className="p-4 pb-24 lg:p-8 lg:pb-8">
+      {/* Sync Status */}
+      {(isSyncing || lastSyncError) && (
+        <div className={`mb-4 flex items-center gap-2 text-xs ${lastSyncError ? 'text-red-400' : 'text-zinc-500'}`}>
+          {isSyncing ? (
+            <><Cloud size={12} className="animate-pulse" /> Synchronisiere...</>
+          ) : (
+            <><CloudOff size={12} /> {lastSyncError}</>
+          )}
+        </div>
+      )}
+
       {/* Desktop: Two Column Layout */}
       <div className="lg:grid lg:grid-cols-12 lg:gap-8">
 
@@ -297,7 +199,7 @@ export default function TodayPage() {
                       <Scale size={14} className="text-zinc-500" />
                       <span className="text-xs text-zinc-500">Gewicht</span>
                     </div>
-                    <p className="text-lg font-semibold">{profile.currentWeight}<span className="text-xs text-zinc-500 ml-0.5">kg</span></p>
+                    <p className="text-lg font-semibold">{data.profile.currentWeight}<span className="text-xs text-zinc-500 ml-0.5">kg</span></p>
                   </Card>
                 </button>
                 <Card className="p-3">
@@ -323,7 +225,7 @@ export default function TodayPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-zinc-400 mb-1">Aktuelles Gewicht</p>
-                        <p className="text-3xl font-semibold">{profile.currentWeight} <span className="text-lg text-zinc-500">kg</span></p>
+                        <p className="text-3xl font-semibold">{data.profile.currentWeight} <span className="text-lg text-zinc-500">kg</span></p>
                       </div>
                       <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center">
                         <Scale size={24} className="text-zinc-400" />
@@ -353,12 +255,12 @@ export default function TodayPage() {
                 <Card className="p-5">
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-sm text-zinc-400">Fortschritt zum Ziel</span>
-                    <span className="text-sm font-medium">{profile.goalWeight} kg</span>
+                    <span className="text-sm font-medium">{data.profile.goalWeight} kg</span>
                   </div>
                   <div className="h-2 bg-zinc-800 rounded-full overflow-hidden mb-2">
                     <div
                       className="h-full bg-white rounded-full"
-                      style={{ width: `${Math.min(100, (totalLoss / (profile.startWeight - profile.goalWeight)) * 100)}%` }}
+                      style={{ width: `${Math.min(100, (totalLoss / (data.profile.startWeight - data.profile.goalWeight)) * 100)}%` }}
                     />
                   </div>
                   <p className="text-sm text-zinc-500">Noch {remaining.toFixed(1)} kg</p>
@@ -374,7 +276,7 @@ export default function TodayPage() {
                       type="number"
                       value={weightInput}
                       onChange={(e) => setWeightInput(e.target.value)}
-                      placeholder={profile.currentWeight.toString()}
+                      placeholder={data.profile.currentWeight.toString()}
                       className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm lg:text-base"
                       step="0.1"
                       autoFocus
@@ -393,12 +295,12 @@ export default function TodayPage() {
               <Card className="mb-6 p-4 lg:hidden">
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-sm text-zinc-400">Noch {remaining.toFixed(1)} kg zum Ziel</span>
-                  <span className="text-xs text-zinc-500">{profile.goalWeight} kg</span>
+                  <span className="text-xs text-zinc-500">{data.profile.goalWeight} kg</span>
                 </div>
                 <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-white rounded-full"
-                    style={{ width: `${Math.min(100, (totalLoss / (profile.startWeight - profile.goalWeight)) * 100)}%` }}
+                    style={{ width: `${Math.min(100, (totalLoss / (data.profile.startWeight - data.profile.goalWeight)) * 100)}%` }}
                   />
                 </div>
               </Card>
@@ -413,7 +315,7 @@ export default function TodayPage() {
                 <button
                   onClick={() => handleDayChange('A')}
                   className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border transition-all ${
-                    dayType === 'A'
+                    data.dayType === 'A'
                       ? 'bg-white text-black border-white'
                       : 'bg-transparent text-zinc-400 border-zinc-700 hover:border-zinc-600'
                   }`}
@@ -423,7 +325,7 @@ export default function TodayPage() {
                 <button
                   onClick={() => handleDayChange('B')}
                   className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border transition-all ${
-                    dayType === 'B'
+                    data.dayType === 'B'
                       ? 'bg-white text-black border-white'
                       : 'bg-transparent text-zinc-400 border-zinc-700 hover:border-zinc-600'
                   }`}
@@ -458,7 +360,7 @@ export default function TodayPage() {
             <button
               onClick={() => handleDayChange('A')}
               className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border ${
-                dayType === 'A'
+                data.dayType === 'A'
                   ? 'bg-white text-black border-white'
                   : 'bg-transparent text-zinc-400 border-zinc-800 hover:border-zinc-700'
               }`}
@@ -468,7 +370,7 @@ export default function TodayPage() {
             <button
               onClick={() => handleDayChange('B')}
               className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border ${
-                dayType === 'B'
+                data.dayType === 'B'
                   ? 'bg-white text-black border-white'
                   : 'bg-transparent text-zinc-400 border-zinc-800 hover:border-zinc-700'
               }`}

@@ -1,95 +1,31 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, User, Target, Flame, Check, Cloud, LogOut } from 'lucide-react';
+import { Save, User, Target, Flame, Check, Cloud, LogOut, RefreshCw } from 'lucide-react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
 import { signOut, useSession } from '@/lib/auth-client';
-
-interface Profile {
-  name: string;
-  startWeight: number;
-  currentWeight: number;
-  goalWeight: number;
-  startDate: string;
-  calorieTarget: number;
-  proteinTarget: number;
-  tdee: number;
-}
-
-const PROFILE_KEY = 'cutboard_profile';
-
-const DEFAULT_PROFILE: Profile = {
-  name: 'Alex',
-  startWeight: 90,
-  currentWeight: 90,
-  goalWeight: 82,
-  startDate: '2024-12-01',
-  calorieTarget: 1700,
-  proteinTarget: 157,
-  tdee: 2125,
-};
+import { useData } from '@/lib/data-store';
 
 export default function SettingsPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
-  const [saving, setSaving] = useState(false);
+  const { data, isLoading, isSyncing, lastSyncError, updateProfile, forceSync } = useData();
+
+  // Local form state for editing
+  const [formData, setFormData] = useState<typeof data.profile | null>(null);
   const [saved, setSaved] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-    loadProfile();
-  }, []);
-
-  const loadProfile = async () => {
-    // Load from localStorage
-    const saved = localStorage.getItem(PROFILE_KEY);
-    if (saved) {
-      setProfile(JSON.parse(saved));
-    }
-
-    // Try to load from server
-    try {
-      const response = await fetch('/api/sync');
-      if (response.ok) {
-        const data = await response.json();
-        if (data?.profile) {
-          setProfile(data.profile);
-          localStorage.setItem(PROFILE_KEY, JSON.stringify(data.profile));
-        }
-      }
-    } catch (e) {
-      console.log('Server sync unavailable');
-    }
-  };
+  // Initialize form data from store when it loads
+  const profile = formData ?? data.profile;
 
   const handleSave = async () => {
-    setSaving(true);
-    setSaved(false);
+    if (!formData) return;
 
-    // Save locally
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-
-    // Sync to server
-    try {
-      const existingData = localStorage.getItem('cutboard_data');
-      const data = existingData ? JSON.parse(existingData) : {};
-      data.profile = profile;
-
-      await fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-    } catch (e) {
-      console.log('Server sync failed');
-    }
-
-    setSaving(false);
+    updateProfile(formData);
+    setFormData(null); // Clear local edits
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -100,11 +36,14 @@ export default function SettingsPage() {
     router.refresh();
   };
 
-  const updateField = (field: keyof Profile, value: string | number) => {
-    setProfile(prev => ({ ...prev, [field]: value }));
+  const updateField = (field: keyof typeof data.profile, value: string | number) => {
+    const current = formData ?? data.profile;
+    setFormData({ ...current, [field]: value });
   };
 
-  if (!mounted) {
+  const hasChanges = formData !== null;
+
+  if (isLoading) {
     return (
       <div className="p-4 animate-pulse">
         <div className="h-8 bg-zinc-900 rounded w-1/2 mb-4"></div>
@@ -124,16 +63,30 @@ export default function SettingsPage() {
           <p className="text-zinc-500 text-sm">Deine persönlichen Ziele</p>
           <h1 className="text-xl font-semibold tracking-tight">Einstellungen</h1>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
-          {saved ? (
-            <><Check size={16} className="mr-1" /> Gespeichert</>
-          ) : saving ? (
-            <><Cloud size={16} className="mr-1 animate-pulse" /> Speichern...</>
-          ) : (
-            <><Save size={16} className="mr-1" /> Speichern</>
+        <div className="flex gap-2">
+          {lastSyncError && (
+            <Button onClick={forceSync} variant="secondary" size="sm" disabled={isSyncing}>
+              <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+            </Button>
           )}
-        </Button>
+          <Button onClick={handleSave} disabled={!hasChanges || isSyncing}>
+            {saved ? (
+              <><Check size={16} className="mr-1" /> Gespeichert</>
+            ) : isSyncing ? (
+              <><Cloud size={16} className="mr-1 animate-pulse" /> Speichern...</>
+            ) : (
+              <><Save size={16} className="mr-1" /> Speichern</>
+            )}
+          </Button>
+        </div>
       </div>
+
+      {/* Sync Status */}
+      {lastSyncError && (
+        <div className="mb-4 p-3 bg-red-900/20 border border-red-800 rounded-lg text-sm text-red-400">
+          {lastSyncError} - Änderungen werden lokal gespeichert
+        </div>
+      )}
 
       {/* Account */}
       <Card className="mb-4">
