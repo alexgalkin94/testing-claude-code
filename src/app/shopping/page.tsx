@@ -1,119 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, ShoppingCart, Minus, Plus } from 'lucide-react';
+import { Check, Minus, Plus, RotateCcw } from 'lucide-react';
 import Card from '@/components/Card';
-import Button from '@/components/Button';
-
-interface ShoppingCategory {
-  id: string;
-  name: string;
-  emoji: string;
-  description: string;
-  perDay: string;
-  items: {
-    id: string;
-    name: string;
-    note?: string;
-  }[];
-  calculateAmount: (days: number) => string;
-}
-
-const SHOPPING_CATEGORIES: ShoppingCategory[] = [
-  {
-    id: 'protein',
-    name: 'Protein',
-    emoji: '🥩',
-    description: 'Wähle nach Vorliebe - alle austauschbar',
-    perDay: '~400g (Mittag + Abend)',
-    items: [
-      { id: 'chicken', name: 'Hähnchenbrust' },
-      { id: 'turkey', name: 'Putenbrust' },
-      { id: 'beef', name: 'Rinderhack 5%' },
-      { id: 'fish', name: 'Weißfisch (Kabeljau, Pangasius)' },
-      { id: 'shrimp', name: 'Garnelen' },
-      { id: 'tuna', name: 'Thunfisch (Dose)', note: '1 Dose = 1 Portion' },
-      { id: 'pork', name: 'Schweinefilet' },
-    ],
-    calculateAmount: (days) => `~${(days * 0.4).toFixed(1)}kg gesamt`,
-  },
-  {
-    id: 'eggs',
-    name: 'Eier',
-    emoji: '🥚',
-    description: '3 Eier pro Tag zum Frühstück',
-    perDay: '3 Stück',
-    items: [
-      { id: 'eggs', name: 'Eier (L)' },
-    ],
-    calculateAmount: (days) => `${days * 3} Stück (${Math.ceil(days * 3 / 10)} Packungen à 10)`,
-  },
-  {
-    id: 'carbs',
-    name: 'Kohlenhydrate',
-    emoji: '🍚',
-    description: 'Mix nach Vorliebe für Frühstück + Mittag',
-    perDay: '~300g Kartoffeln ODER ~60g Reis/Nudeln + Frühstücks-Carbs',
-    items: [
-      { id: 'potatoes', name: 'Kartoffeln' },
-      { id: 'sweet-potatoes', name: 'Süßkartoffeln' },
-      { id: 'rice', name: 'Reis' },
-      { id: 'pasta', name: 'Nudeln' },
-      { id: 'oats', name: 'Haferflocken', note: '80g pro Tag' },
-      { id: 'bread', name: 'Toast / Sandwiches', note: '3 Stück pro Tag' },
-    ],
-    calculateAmount: (days) => `Kartoffeln: ~${(days * 0.3).toFixed(1)}kg ODER Reis/Nudeln: ~${(days * 60)}g`,
-  },
-  {
-    id: 'dairy',
-    name: 'Milchprodukte',
-    emoji: '🥛',
-    description: 'Für Snack + Frühstück',
-    perDay: '~200g Skyr/Quark + 30g Exquisa',
-    items: [
-      { id: 'skyr', name: 'Skyr' },
-      { id: 'quark', name: 'Magerquark' },
-      { id: 'cottage', name: 'Körniger Frischkäse' },
-      { id: 'exquisa', name: 'Exquisa 0,2%' },
-      { id: 'whey', name: 'Whey Protein', note: '25-30g pro Portion' },
-    ],
-    calculateAmount: (days) => `Skyr/Quark: ~${(days * 0.2).toFixed(1)}kg, Exquisa: 1 Pack`,
-  },
-  {
-    id: 'frozen',
-    name: 'Tiefkühl',
-    emoji: '❄️',
-    description: 'Convenience für schnelle Mahlzeiten',
-    perDay: '1 Gemüsepfanne, ½ an Tag B',
-    items: [
-      { id: 'iglo', name: 'Iglo Schlemmer-Filet', note: 'Nur Tag A' },
-      { id: 'frosta', name: 'Frosta Gemüsepfanne 480g' },
-    ],
-    calculateAmount: (days) => {
-      const iglo = Math.ceil(days / 2);
-      const frosta = Math.ceil(days * 0.75);
-      return `Iglo: ${iglo} Stück, Frosta: ${frosta} Packungen`;
-    },
-  },
-  {
-    id: 'meat-products',
-    name: 'Fleischwaren',
-    emoji: '🥓',
-    description: 'Fürs Frühstück',
-    perDay: '2 Scheiben',
-    items: [
-      { id: 'ham', name: 'Backschinken' },
-    ],
-    calculateAmount: (days) => `${Math.ceil(days / 5)} Packung(en)`,
-  },
-];
 
 export default function ShoppingPage() {
   const [days, setDays] = useState(7);
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(SHOPPING_CATEGORIES.map(c => c.id))
-  );
 
   const toggleItem = (id: string) => {
     setCheckedItems(prev => {
@@ -124,141 +17,256 @@ export default function ShoppingPage() {
     });
   };
 
-  const toggleCategory = (id: string) => {
-    setExpandedCategories(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const resetList = () => setCheckedItems(new Set());
+
+  // Calculations based on days
+  const calc = {
+    proteinKg: (days * 0.4).toFixed(1), // ~400g/day total
+    eggs: days * 3,
+    eggPacks: Math.ceil((days * 3) / 10),
+    dairyG: days * 200,
+    dairyPacks: Math.ceil((days * 200) / 450), // Skyr is 450g
+    exquisaPacks: Math.ceil((days * 30) / 200),
+    hamPacks: Math.ceil((days * 2) / 10), // ~10 Scheiben pro Pack
+    potatoKg: (days * 0.3).toFixed(1),
+    potatoPacks: Math.ceil((days * 0.3) / 2), // 2kg Sack
+    toastSlices: days * 3,
+    toastPacks: Math.ceil((days * 3) / 10), // ~10 pro Packung
+    iglo: Math.ceil(days / 2),
+    frosta: Math.ceil(days * 0.8),
   };
 
-  const totalItems = SHOPPING_CATEGORIES.reduce((sum, cat) => sum + cat.items.length, 0);
-  const checkedCount = checkedItems.size;
+  // Fresh items - buy every week
+  const freshItems = [
+    {
+      id: 'protein',
+      name: 'Protein',
+      amount: `~${calc.proteinKg}kg`,
+      note: 'Mix was frisch/günstig ist',
+      sub: 'Hähnchen 400g/600g • Hack 400g • Pute • Fisch',
+    },
+    {
+      id: 'eggs',
+      name: 'Eier',
+      amount: `${calc.eggPacks}× 10er`,
+      note: `${calc.eggs} Stück (3/Tag)`,
+    },
+    {
+      id: 'dairy',
+      name: 'Skyr / Magerquark',
+      amount: `${calc.dairyPacks}× Becher`,
+      note: `~${calc.dairyG}g für Abend-Snacks`,
+    },
+    {
+      id: 'exquisa',
+      name: 'Exquisa 0,2%',
+      amount: `${calc.exquisaPacks}× Pack`,
+      note: '30g/Tag fürs Rührei',
+    },
+    {
+      id: 'ham',
+      name: 'Backschinken',
+      amount: `${calc.hamPacks}× Pack`,
+      note: '2 Scheiben/Tag',
+    },
+    {
+      id: 'potatoes',
+      name: 'Kartoffeln',
+      amount: `${calc.potatoPacks}× 2kg`,
+      note: `~${calc.potatoKg}kg (oder Süßkartoffeln)`,
+    },
+    {
+      id: 'toast',
+      name: 'Toast / Sandwiches',
+      amount: `${calc.toastPacks}× Pack`,
+      note: `${calc.toastSlices} Stück (3/Tag)`,
+    },
+  ];
+
+  // Frozen - lasts longer
+  const frozenItems = [
+    {
+      id: 'iglo',
+      name: 'Iglo Schlemmer-Filet',
+      amount: `${calc.iglo}×`,
+      note: 'Für Tag A Mittag',
+    },
+    {
+      id: 'frosta',
+      name: 'Frosta Gemüsepfanne',
+      amount: `${calc.frosta}×`,
+      note: 'Fürs Abendessen',
+    },
+  ];
+
+  // Stock items - just check if you need more
+  const stockItems = [
+    { id: 'rice', name: 'Reis' },
+    { id: 'pasta', name: 'Nudeln' },
+    { id: 'oats', name: 'Haferflocken' },
+  ];
+
+  const mainItems = [...freshItems, ...frozenItems];
+  const checkedMain = mainItems.filter(i => checkedItems.has(i.id)).length;
 
   return (
     <div className="p-4 pb-24">
       {/* Header */}
-      <div className="mb-6">
-        <p className="text-zinc-500 text-sm">Basierend auf deinem Ernährungsplan</p>
-        <h1 className="text-xl font-semibold tracking-tight">Einkaufsliste</h1>
-      </div>
-
-      {/* Days Selector */}
-      <Card className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium">Für wie viele Tage?</p>
-            <p className="text-sm text-zinc-500">Mengen werden berechnet</p>
-          </div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <p className="text-zinc-500 text-sm">Einkaufen für</p>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setDays(d => Math.max(1, d - 1))}
-              className="w-10 h-10 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
             >
-              <Minus size={18} />
+              <Minus size={16} />
             </button>
-            <span className="text-2xl font-semibold w-12 text-center">{days}</span>
+            <span className="text-2xl font-bold w-8 text-center">{days}</span>
             <button
               onClick={() => setDays(d => Math.min(14, d + 1))}
-              className="w-10 h-10 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
             >
-              <Plus size={18} />
+              <Plus size={16} />
             </button>
+            <span className="text-xl font-semibold text-zinc-400">Tage</span>
           </div>
         </div>
-      </Card>
-
-      {/* Progress */}
-      <Card className="mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <ShoppingCart className="text-zinc-400" size={20} />
-            <span className="text-sm text-zinc-400">Fortschritt</span>
-          </div>
-          <span className="text-sm font-medium">{checkedCount}/{totalItems}</span>
-        </div>
-        <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-3">
-          <div
-            className="h-full bg-white transition-all duration-300 rounded-full"
-            style={{ width: `${totalItems > 0 ? (checkedCount / totalItems) * 100 : 0}%` }}
-          />
-        </div>
-      </Card>
-
-      {/* Categories */}
-      <div className="space-y-4">
-        {SHOPPING_CATEGORIES.map(category => (
-          <Card key={category.id}>
-            {/* Category Header */}
-            <button
-              onClick={() => toggleCategory(category.id)}
-              className="w-full text-left"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{category.emoji}</span>
-                  <div>
-                    <h3 className="font-medium">{category.name}</h3>
-                    <p className="text-xs text-zinc-500">{category.description}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-emerald-500">
-                    {category.calculateAmount(days)}
-                  </p>
-                  <p className="text-xs text-zinc-600">{category.perDay}</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Items */}
-            {expandedCategories.has(category.id) && (
-              <div className="mt-4 pt-4 border-t border-zinc-800 space-y-2">
-                {category.items.map(item => (
-                  <div
-                    key={item.id}
-                    onClick={() => toggleItem(item.id)}
-                    className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all ${
-                      checkedItems.has(item.id)
-                        ? 'bg-emerald-500/10'
-                        : 'bg-zinc-800/50 hover:bg-zinc-800'
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
-                        checkedItems.has(item.id)
-                          ? 'bg-emerald-500 border-emerald-500 text-white'
-                          : 'bg-transparent border-zinc-700'
-                      }`}
-                    >
-                      {checkedItems.has(item.id) && <Check size={12} strokeWidth={3} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span
-                        className={`text-sm ${
-                          checkedItems.has(item.id) ? 'text-zinc-500 line-through' : ''
-                        }`}
-                      >
-                        {item.name}
-                      </span>
-                      {item.note && (
-                        <span className="text-xs text-zinc-600 ml-2">({item.note})</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        ))}
+        {checkedItems.size > 0 && (
+          <button onClick={resetList} className="p-2 text-zinc-500 hover:text-white">
+            <RotateCcw size={20} />
+          </button>
+        )}
       </div>
 
-      {/* Tips */}
-      <Card className="mt-6 bg-zinc-800/50 border-zinc-700">
-        <p className="text-sm text-zinc-300">
-          <strong>Tipp:</strong> Die Proteinquellen sind austauschbar. Kaufe was frisch ist oder im Angebot.
-          200g Hähnchen ≈ 225g Garnelen ≈ 275g Weißfisch ≈ 175g Rinderhack.
+      {/* Progress */}
+      {checkedMain > 0 && (
+        <div className="mb-6">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-zinc-500">{checkedMain} von {mainItems.length}</span>
+            {checkedMain === mainItems.length && <span className="text-emerald-500">Fertig! ✓</span>}
+          </div>
+          <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-emerald-500 transition-all"
+              style={{ width: `${(checkedMain / mainItems.length) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Fresh Items */}
+      <Card className="mb-4">
+        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-4">
+          🛒 Frisch (diese Woche)
+        </h2>
+        <div className="space-y-1">
+          {freshItems.map(item => {
+            const isChecked = checkedItems.has(item.id);
+            return (
+              <div
+                key={item.id}
+                onClick={() => toggleItem(item.id)}
+                className={`flex items-start gap-3 p-3 -mx-1 rounded-lg cursor-pointer transition-all ${
+                  isChecked ? 'bg-emerald-500/5' : 'hover:bg-zinc-800/50'
+                }`}
+              >
+                <div className={`w-5 h-5 mt-0.5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                  isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-700'
+                }`}>
+                  {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className={`font-medium ${isChecked ? 'line-through text-zinc-500' : ''}`}>
+                      {item.name}
+                    </span>
+                    <span className={`font-mono text-sm flex-shrink-0 ${
+                      isChecked ? 'text-zinc-600' : 'text-emerald-500'
+                    }`}>
+                      {item.amount}
+                    </span>
+                  </div>
+                  <p className={`text-xs ${isChecked ? 'text-zinc-600' : 'text-zinc-500'}`}>
+                    {item.note}
+                  </p>
+                  {item.sub && !isChecked && (
+                    <p className="text-xs text-zinc-600 mt-1">{item.sub}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Frozen */}
+      <Card className="mb-4">
+        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-4">
+          ❄️ Tiefkühl
+        </h2>
+        <div className="space-y-1">
+          {frozenItems.map(item => {
+            const isChecked = checkedItems.has(item.id);
+            return (
+              <div
+                key={item.id}
+                onClick={() => toggleItem(item.id)}
+                className={`flex items-start gap-3 p-3 -mx-1 rounded-lg cursor-pointer transition-all ${
+                  isChecked ? 'bg-emerald-500/5' : 'hover:bg-zinc-800/50'
+                }`}
+              >
+                <div className={`w-5 h-5 mt-0.5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                  isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-700'
+                }`}>
+                  {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className={`font-medium ${isChecked ? 'line-through text-zinc-500' : ''}`}>
+                      {item.name}
+                    </span>
+                    <span className={`font-mono text-sm ${
+                      isChecked ? 'text-zinc-600' : 'text-emerald-500'
+                    }`}>
+                      {item.amount}
+                    </span>
+                  </div>
+                  <p className={`text-xs ${isChecked ? 'text-zinc-600' : 'text-zinc-500'}`}>
+                    {item.note}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Stock Check */}
+      <Card className="bg-zinc-900/50">
+        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-4">
+          📦 Vorrat - brauchst du noch?
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          {stockItems.map(item => {
+            const isChecked = checkedItems.has(`stock-${item.id}`);
+            return (
+              <button
+                key={item.id}
+                onClick={() => toggleItem(`stock-${item.id}`)}
+                className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
+                  isChecked
+                    ? 'bg-emerald-500/20 text-emerald-400 line-through'
+                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                }`}
+              >
+                {isChecked ? '✓ ' : ''}{item.name}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-zinc-600 mt-3">
+          Tap = hab ich noch / brauch ich nicht
         </p>
       </Card>
     </div>
