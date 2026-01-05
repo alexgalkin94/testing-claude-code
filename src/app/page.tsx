@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { format, subDays, addDays, isToday, differenceInDays } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Check, ChevronDown, Scale, Flame, TrendingDown, TrendingUp, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff, Pencil, Target, Plus, Zap } from 'lucide-react';
+import { Check, ChevronDown, Scale, Flame, TrendingDown, TrendingUp, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff, Pencil, Target, Plus } from 'lucide-react';
 import Card from '@/components/Card';
 import { useData } from '@/lib/data-store';
 import {
@@ -200,53 +200,6 @@ export default function TodayPage() {
       ? weeklyTrend
       : (effectiveDays > 0 ? (actualLoss / effectiveDays) * 7 : 0);
 
-    // Calculate adaptive TDEE from real data
-    // Requirements: 21+ days, 14+ weight entries after water period, 10+ days calorie tracking
-    let calculatedTdee: number | null = null;
-    let tdeeConfidence: 'low' | 'medium' | 'high' | null = null;
-
-    if (daysElapsed >= 21 && weightsAfterWaterPeriod.length >= 10) {
-      // Calculate average daily calories consumed (exclude first 7 days)
-      let totalCaloriesConsumed = 0;
-      let daysWithData = 0;
-
-      for (let i = 7; i < Math.min(daysElapsed, 35); i++) {
-        const dateStr = format(subDays(today, daysElapsed - i), 'yyyy-MM-dd');
-        const dayCheckedItems = data.checklist[dateStr] || [];
-        const extraCals = data.extraCalories?.[dateStr] || 0;
-
-        let dayCalories = extraCals;
-        plan.meals.forEach(meal => {
-          meal.items.forEach(item => {
-            if (dayCheckedItems.includes(item.id)) {
-              dayCalories += item.calories;
-            }
-          });
-        });
-
-        if (dayCheckedItems.length > 0 || extraCals > 0) {
-          totalCaloriesConsumed += dayCalories;
-          daysWithData++;
-        }
-      }
-
-      // Need at least 10 days of calorie data and positive weight loss
-      if (daysWithData >= 10 && weeklyTrend !== null && weeklyTrend > 0.1) {
-        const avgDailyCalories = totalCaloriesConsumed / daysWithData;
-        const dailyDeficitFromWeight = (weeklyTrend * 7700) / 7;
-        calculatedTdee = Math.round(avgDailyCalories + dailyDeficitFromWeight);
-
-        // Confidence based on data quality
-        if (daysElapsed >= 35 && daysWithData >= 21 && weightsAfterWaterPeriod.length >= 21) {
-          tdeeConfidence = 'high';
-        } else if (daysElapsed >= 28 && daysWithData >= 14) {
-          tdeeConfidence = 'medium';
-        } else {
-          tdeeConfidence = 'low';
-        }
-      }
-    }
-
     // Projected completion
     const remainingToLose = rollingAvgWeight - data.profile.goalWeight;
     const actualRatePerDay = actualRatePerWeek / 7;
@@ -254,13 +207,6 @@ export default function TodayPage() {
     const projectedDate = actualRatePerDay > 0 && projectedDaysRemaining < 365
       ? addDays(today, Math.ceil(projectedDaysRemaining))
       : null;
-
-    const expectedDaysTotal = totalToLose / expectedLossPerDay;
-    const expectedDate = addDays(startDate, Math.ceil(expectedDaysTotal) + 7);
-
-    // Data status for UI
-    const daysUntilTdee = Math.max(0, 21 - daysElapsed);
-    const weightsNeeded = Math.max(0, 10 - weightsAfterWaterPeriod.length);
 
     return {
       daysElapsed,
@@ -270,16 +216,10 @@ export default function TodayPage() {
       actualRatePerWeek,
       expectedLossPerWeek,
       projectedDate,
-      expectedDate,
       remainingToLose,
       rollingAvgWeight,
-      calculatedTdee,
-      tdeeConfidence,
-      daysUntilTdee,
-      weightsNeeded,
-      hasEnoughData: weightsAfterWaterPeriod.length >= 7,
     };
-  }, [data.profile, data.weights, data.checklist, data.extraCalories, plan.meals]);
+  }, [data.profile, data.weights]);
 
   const isViewingToday = isToday(selectedDate);
 
@@ -537,30 +477,6 @@ export default function TodayPage() {
                   <p className="text-sm text-zinc-500">Noch {remaining.toFixed(1)} kg</p>
                 </Card>
 
-                {/* Calculated TDEE */}
-                <Card className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap size={16} className="text-yellow-500" />
-                    <span className="text-sm text-zinc-400">Berechneter TDEE</span>
-                  </div>
-                  {progressTracking.calculatedTdee ? (
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-2xl font-semibold text-yellow-500">
-                        {progressTracking.calculatedTdee}
-                      </p>
-                      <span className="text-sm text-zinc-500">kcal</span>
-                      <span className="text-xs text-zinc-600 ml-2">
-                        (Annahme: {data.profile.tdee})
-                      </span>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-zinc-600">
-                      {!progressTracking.hasEnoughData
-                        ? `Noch ${7 - data.weights.length} Gewichtseinträge nötig`
-                        : 'Noch ~14 Tage Tracking nötig'}
-                    </p>
-                  )}
-                </Card>
               </div>
 
               {/* Mobile Progress Card - Refined elegant design */}
@@ -606,55 +522,6 @@ export default function TodayPage() {
                 </div>
               </Card>
 
-              {/* Mobile TDEE Card - Elegant design */}
-              <Card className="mb-6 p-0 lg:hidden overflow-hidden">
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Zap size={14} className="text-yellow-500" />
-                      <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">
-                        {progressTracking.calculatedTdee ? 'Berechneter TDEE' : 'TDEE Berechnung'}
-                      </span>
-                    </div>
-                    {progressTracking.tdeeConfidence && (
-                      <span className={`text-[10px] uppercase tracking-wider font-medium ${
-                        progressTracking.tdeeConfidence === 'high' ? 'text-emerald-500' :
-                        progressTracking.tdeeConfidence === 'medium' ? 'text-yellow-500' : 'text-zinc-500'
-                      }`}>
-                        {progressTracking.tdeeConfidence === 'high' ? 'Hoch' :
-                         progressTracking.tdeeConfidence === 'medium' ? 'Mittel' : 'Niedrig'}
-                      </span>
-                    )}
-                  </div>
-                  {progressTracking.calculatedTdee ? (
-                    <div className="mt-2">
-                      <span className="text-2xl font-semibold tracking-tight text-yellow-500">
-                        {progressTracking.calculatedTdee}
-                      </span>
-                      <span className="text-sm text-yellow-500/70 ml-1">kcal</span>
-                      <p className="text-[10px] text-zinc-600 mt-1">
-                        Annahme war {data.profile.tdee} kcal
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="mt-2">
-                      <p className="text-sm text-zinc-500">
-                        {progressTracking.daysUntilTdee > 0
-                          ? `Noch ${progressTracking.daysUntilTdee} Tage`
-                          : progressTracking.weightsNeeded > 0
-                          ? `Noch ${progressTracking.weightsNeeded} Gewichtseinträge`
-                          : 'Noch mehr Kalorientracking nötig'}
-                      </p>
-                      <div className="h-1 bg-zinc-800/50 rounded-full overflow-hidden mt-2">
-                        <div
-                          className="h-full bg-yellow-500/50 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(100, ((21 - progressTracking.daysUntilTdee) / 21) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
             </>
           )}
 
