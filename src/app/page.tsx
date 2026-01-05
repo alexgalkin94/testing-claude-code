@@ -605,6 +605,56 @@ export default function TodayPage() {
                   </div>
                 </div>
               </Card>
+
+              {/* Mobile TDEE Card - Elegant design */}
+              <Card className="mb-6 p-0 lg:hidden overflow-hidden">
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Zap size={14} className="text-yellow-500" />
+                      <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">
+                        {progressTracking.calculatedTdee ? 'Berechneter TDEE' : 'TDEE Berechnung'}
+                      </span>
+                    </div>
+                    {progressTracking.tdeeConfidence && (
+                      <span className={`text-[10px] uppercase tracking-wider font-medium ${
+                        progressTracking.tdeeConfidence === 'high' ? 'text-emerald-500' :
+                        progressTracking.tdeeConfidence === 'medium' ? 'text-yellow-500' : 'text-zinc-500'
+                      }`}>
+                        {progressTracking.tdeeConfidence === 'high' ? 'Hoch' :
+                         progressTracking.tdeeConfidence === 'medium' ? 'Mittel' : 'Niedrig'}
+                      </span>
+                    )}
+                  </div>
+                  {progressTracking.calculatedTdee ? (
+                    <div className="mt-2">
+                      <span className="text-2xl font-semibold tracking-tight text-yellow-500">
+                        {progressTracking.calculatedTdee}
+                      </span>
+                      <span className="text-sm text-yellow-500/70 ml-1">kcal</span>
+                      <p className="text-[10px] text-zinc-600 mt-1">
+                        Annahme war {data.profile.tdee} kcal
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-2">
+                      <p className="text-sm text-zinc-500">
+                        {progressTracking.daysUntilTdee > 0
+                          ? `Noch ${progressTracking.daysUntilTdee} Tage`
+                          : progressTracking.weightsNeeded > 0
+                          ? `Noch ${progressTracking.weightsNeeded} Gewichtseinträge`
+                          : 'Noch mehr Kalorientracking nötig'}
+                      </p>
+                      <div className="h-1 bg-zinc-800/50 rounded-full overflow-hidden mt-2">
+                        <div
+                          className="h-full bg-yellow-500/50 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, ((21 - progressTracking.daysUntilTdee) / 21) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
             </>
           )}
 
