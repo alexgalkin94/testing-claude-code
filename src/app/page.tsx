@@ -150,92 +150,117 @@ export default function TodayPage() {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // Calculate 7-day rolling average for current weight
-    const recentWeights = sortedWeights.slice(-7);
-    const rollingAvgWeight = recentWeights.length > 0
-      ? recentWeights.reduce((sum, w) => sum + w.weight, 0) / recentWeights.length
+    // Filter out first 7 days (water weight period) for trend calculations
+    const startDatePlus7 = addDays(startDate, 7);
+    const weightsAfterWaterPeriod = sortedWeights.filter(
+      w => new Date(w.date) >= startDatePlus7
+    );
+
+    // Use 14-day rolling averages for more stability
+    const last14Weights = weightsAfterWaterPeriod.slice(-14);
+    const prev14Weights = weightsAfterWaterPeriod.slice(-28, -14);
+
+    // Current rolling average (last 14 days, excluding water weight period)
+    const rollingAvgWeight = last14Weights.length > 0
+      ? last14Weights.reduce((sum, w) => sum + w.weight, 0) / last14Weights.length
       : data.profile.currentWeight;
 
-    // Calculate 7-day rolling average from 7-14 days ago for trend
-    const olderWeights = sortedWeights.slice(-14, -7);
-    const olderAvgWeight = olderWeights.length > 0
-      ? olderWeights.reduce((sum, w) => sum + w.weight, 0) / olderWeights.length
+    // Previous period average for trend
+    const prevAvgWeight = prev14Weights.length > 0
+      ? prev14Weights.reduce((sum, w) => sum + w.weight, 0) / prev14Weights.length
       : null;
 
-    // Weekly trend based on rolling averages (more stable)
-    const weeklyTrend = olderAvgWeight !== null && recentWeights.length >= 3
-      ? olderAvgWeight - rollingAvgWeight
+    // Bi-weekly trend (more stable than weekly)
+    const biWeeklyTrend = prevAvgWeight !== null && last14Weights.length >= 7
+      ? prevAvgWeight - rollingAvgWeight
       : null;
+
+    // Convert to weekly rate
+    const weeklyTrend = biWeeklyTrend !== null ? biWeeklyTrend / 2 : null;
 
     const totalToLose = data.profile.startWeight - data.profile.goalWeight;
     const actualLoss = data.profile.startWeight - rollingAvgWeight;
 
     // Calculate expected loss rate from calorie deficit
-    // 1kg body fat ≈ 7700 kcal
     const dailyDeficit = data.profile.tdee - data.profile.calorieTarget;
     const expectedLossPerDay = dailyDeficit / 7700;
     const expectedLossPerWeek = expectedLossPerDay * 7;
 
-    const expectedLoss = daysElapsed * expectedLossPerDay;
+    // Expected weight accounts for water weight in first week
+    const effectiveDays = Math.max(0, daysElapsed - 7);
+    const expectedLoss = effectiveDays * expectedLossPerDay;
     const expectedWeight = data.profile.startWeight - expectedLoss;
 
-    // Difference based on rolling average (more stable)
+    // Difference based on rolling average
     const difference = expectedWeight - rollingAvgWeight;
     const isAhead = difference > 0;
 
-    // Actual rate based on rolling average trend OR overall progress
+    // Actual rate - prefer trend-based if available
     const actualRatePerWeek = weeklyTrend !== null
-      ? weeklyTrend // Use trend between rolling averages
-      : (daysElapsed > 0 ? (actualLoss / daysElapsed) * 7 : 0);
+      ? weeklyTrend
+      : (effectiveDays > 0 ? (actualLoss / effectiveDays) * 7 : 0);
 
-    // Calculate adaptive TDEE from real data (need 14+ days and weight tracking)
-    // Formula: actual_tdee = avg_calories_consumed + (weight_lost_per_week * 7700 / 7)
+    // Calculate adaptive TDEE from real data
+    // Requirements: 21+ days, 14+ weight entries after water period, 10+ days calorie tracking
     let calculatedTdee: number | null = null;
-    if (sortedWeights.length >= 7 && daysElapsed >= 14) {
-      // Calculate average daily calories consumed over last 14 days
+    let tdeeConfidence: 'low' | 'medium' | 'high' | null = null;
+
+    if (daysElapsed >= 21 && weightsAfterWaterPeriod.length >= 10) {
+      // Calculate average daily calories consumed (exclude first 7 days)
       let totalCaloriesConsumed = 0;
       let daysWithData = 0;
 
-      for (let i = 0; i < 14; i++) {
-        const dateStr = format(subDays(today, i), 'yyyy-MM-dd');
-        const checkedItems = data.checklist[dateStr] || [];
+      for (let i = 7; i < Math.min(daysElapsed, 35); i++) {
+        const dateStr = format(subDays(today, daysElapsed - i), 'yyyy-MM-dd');
+        const dayCheckedItems = data.checklist[dateStr] || [];
         const extraCals = data.extraCalories?.[dateStr] || 0;
 
-        // Calculate calories from checked items
         let dayCalories = extraCals;
         plan.meals.forEach(meal => {
           meal.items.forEach(item => {
-            if (checkedItems.includes(item.id)) {
+            if (dayCheckedItems.includes(item.id)) {
               dayCalories += item.calories;
             }
           });
         });
 
-        if (checkedItems.length > 0 || extraCals > 0) {
+        if (dayCheckedItems.length > 0 || extraCals > 0) {
           totalCaloriesConsumed += dayCalories;
           daysWithData++;
         }
       }
 
-      // Only calculate if we have enough days with calorie data
-      if (daysWithData >= 7 && weeklyTrend !== null && weeklyTrend > 0) {
+      // Need at least 10 days of calorie data and positive weight loss
+      if (daysWithData >= 10 && weeklyTrend !== null && weeklyTrend > 0.1) {
         const avgDailyCalories = totalCaloriesConsumed / daysWithData;
         const dailyDeficitFromWeight = (weeklyTrend * 7700) / 7;
         calculatedTdee = Math.round(avgDailyCalories + dailyDeficitFromWeight);
+
+        // Confidence based on data quality
+        if (daysElapsed >= 35 && daysWithData >= 21 && weightsAfterWaterPeriod.length >= 21) {
+          tdeeConfidence = 'high';
+        } else if (daysElapsed >= 28 && daysWithData >= 14) {
+          tdeeConfidence = 'medium';
+        } else {
+          tdeeConfidence = 'low';
+        }
       }
     }
 
-    // Projected days to goal based on actual rate
+    // Projected completion
     const remainingToLose = rollingAvgWeight - data.profile.goalWeight;
     const actualRatePerDay = actualRatePerWeek / 7;
     const projectedDaysRemaining = actualRatePerDay > 0 ? remainingToLose / actualRatePerDay : Infinity;
-    const projectedDate = actualRatePerDay > 0
+    const projectedDate = actualRatePerDay > 0 && projectedDaysRemaining < 365
       ? addDays(today, Math.ceil(projectedDaysRemaining))
       : null;
 
-    // Expected completion date at target deficit rate
     const expectedDaysTotal = totalToLose / expectedLossPerDay;
-    const expectedDate = addDays(startDate, Math.ceil(expectedDaysTotal));
+    const expectedDate = addDays(startDate, Math.ceil(expectedDaysTotal) + 7);
+
+    // Data status for UI
+    const daysUntilTdee = Math.max(0, 21 - daysElapsed);
+    const weightsNeeded = Math.max(0, 10 - weightsAfterWaterPeriod.length);
 
     return {
       daysElapsed,
@@ -249,7 +274,10 @@ export default function TodayPage() {
       remainingToLose,
       rollingAvgWeight,
       calculatedTdee,
-      hasEnoughData: sortedWeights.length >= 7,
+      tdeeConfidence,
+      daysUntilTdee,
+      weightsNeeded,
+      hasEnoughData: weightsAfterWaterPeriod.length >= 7,
     };
   }, [data.profile, data.weights, data.checklist, data.extraCalories, plan.meals]);
 
@@ -321,70 +349,73 @@ export default function TodayPage() {
           {/* Stats - Only on Today */}
           {isViewingToday && (
             <>
-              {/* Mobile Stats Row */}
-              <div className="grid grid-cols-3 gap-3 mb-6 lg:hidden">
-                <Card className="p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <Scale size={14} className="text-zinc-500" />
-                      <span className="text-xs text-zinc-500">Gewicht</span>
+              {/* Mobile Stats Row - Elegant minimal design */}
+              <div className="mb-6 lg:hidden">
+                <Card className="p-0 overflow-hidden">
+                  <div className="grid grid-cols-3 divide-x divide-zinc-800/50">
+                    {/* Weight */}
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Gewicht</span>
+                        {!showWeightInput && (
+                          <button
+                            onClick={() => setShowWeightInput(true)}
+                            className="p-1 -m-1 text-zinc-600 hover:text-zinc-400 transition-colors"
+                          >
+                            <Pencil size={11} />
+                          </button>
+                        )}
+                      </div>
+                      {showWeightInput ? (
+                        <div className="space-y-2">
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            value={weightInput}
+                            onChange={(e) => setWeightInput(e.target.value)}
+                            placeholder={data.profile.currentWeight.toString()}
+                            className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-md px-2 py-1.5 text-sm font-medium"
+                            step="0.1"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleQuickWeight();
+                              if (e.key === 'Escape') { setShowWeightInput(false); setWeightInput(''); }
+                            }}
+                            onBlur={() => { if (!weightInput) { setShowWeightInput(false); } }}
+                          />
+                          <button
+                            onClick={handleQuickWeight}
+                            className="w-full bg-white text-black py-1 rounded-md text-xs font-semibold"
+                          >
+                            Speichern
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="text-xl font-semibold tracking-tight">{data.profile.currentWeight}</span>
+                          <span className="text-sm text-zinc-500 ml-1">kg</span>
+                        </div>
+                      )}
                     </div>
-                    {!showWeightInput && (
-                      <button
-                        onClick={() => setShowWeightInput(true)}
-                        className="p-1 -m-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300"
-                      >
-                        <Pencil size={12} />
-                      </button>
-                    )}
-                  </div>
-                  {showWeightInput ? (
-                    <div className="flex gap-1.5 mt-1">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        value={weightInput}
-                        onChange={(e) => setWeightInput(e.target.value)}
-                        placeholder={data.profile.currentWeight.toString()}
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm"
-                        step="0.1"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleQuickWeight();
-                          if (e.key === 'Escape') { setShowWeightInput(false); setWeightInput(''); }
-                        }}
-                        onBlur={() => { if (!weightInput) { setShowWeightInput(false); } }}
-                      />
-                      <button
-                        onClick={handleQuickWeight}
-                        className="bg-white text-black px-2 py-1 rounded text-xs font-medium"
-                      >
-                        OK
-                      </button>
+                    {/* Lost */}
+                    <div className="p-4">
+                      <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium block mb-2">Verloren</span>
+                      <div>
+                        <span className="text-xl font-semibold tracking-tight text-emerald-400">−{totalLoss.toFixed(1)}</span>
+                        <span className="text-sm text-emerald-400/70 ml-1">kg</span>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-lg font-semibold">{data.profile.currentWeight}<span className="text-xs text-zinc-500 ml-0.5">kg</span></p>
-                  )}
-                </Card>
-                <Card className="p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <TrendingDown size={14} className="text-emerald-500" />
-                    <span className="text-xs text-zinc-500">Verloren</span>
+                    {/* vs Plan */}
+                    <div className="p-4">
+                      <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium block mb-2">vs. Plan</span>
+                      <div>
+                        <span className={`text-xl font-semibold tracking-tight ${progressTracking.isAhead ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {progressTracking.isAhead ? '+' : '−'}{progressTracking.difference.toFixed(1)}
+                        </span>
+                        <span className={`text-sm ml-1 ${progressTracking.isAhead ? 'text-emerald-400/70' : 'text-red-400/70'}`}>kg</span>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-lg font-semibold text-emerald-500">-{totalLoss.toFixed(1)}<span className="text-xs ml-0.5">kg</span></p>
-                </Card>
-                <Card className="p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    {progressTracking.isAhead ? (
-                      <TrendingUp size={14} className="text-emerald-500" />
-                    ) : (
-                      <TrendingDown size={14} className="text-red-500" />
-                    )}
-                    <span className="text-xs text-zinc-500">vs. Plan</span>
-                  </div>
-                  <p className={`text-lg font-semibold ${progressTracking.isAhead ? 'text-emerald-500' : 'text-red-500'}`}>
-                    {progressTracking.isAhead ? '+' : '-'}{progressTracking.difference.toFixed(1)}<span className="text-xs ml-0.5">kg</span>
-                  </p>
                 </Card>
               </div>
 
@@ -532,28 +563,46 @@ export default function TodayPage() {
                 </Card>
               </div>
 
-              {/* Mobile Progress Bar */}
-              <Card className="mb-6 p-4 lg:hidden">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-zinc-400">Noch {remaining.toFixed(1)} kg zum Ziel</span>
-                  <span className="text-xs text-zinc-500">{data.profile.goalWeight} kg</span>
+              {/* Mobile Progress Card - Refined elegant design */}
+              <Card className="mb-6 p-0 lg:hidden overflow-hidden">
+                {/* Progress to goal */}
+                <div className="p-4 pb-3">
+                  <div className="flex items-baseline justify-between mb-3">
+                    <div>
+                      <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Noch zum Ziel</span>
+                      <div className="mt-1">
+                        <span className="text-2xl font-semibold tracking-tight">{remaining.toFixed(1)}</span>
+                        <span className="text-sm text-zinc-500 ml-1">kg</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[11px] uppercase tracking-wider text-zinc-600 font-medium">Ziel</span>
+                      <p className="text-sm text-zinc-400 mt-1">{data.profile.goalWeight} kg</p>
+                    </div>
+                  </div>
+                  <div className="h-1 bg-zinc-800/50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-zinc-400 to-white rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, (totalLoss / (data.profile.startWeight - data.profile.goalWeight)) * 100)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-3">
-                  <div
-                    className="h-full bg-white rounded-full"
-                    style={{ width: `${Math.min(100, (totalLoss / (data.profile.startWeight - data.profile.goalWeight)) * 100)}%` }}
-                  />
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-zinc-500">
-                    <Target size={12} className="inline mr-1" />
-                    {progressTracking.projectedDate
-                      ? format(progressTracking.projectedDate, 'd. MMM', { locale: de })
-                      : '–'}
-                  </span>
-                  <span className={progressTracking.actualRatePerWeek >= progressTracking.expectedLossPerWeek ? 'text-emerald-500' : 'text-red-500'}>
-                    {progressTracking.actualRatePerWeek.toFixed(2)}<span className="text-zinc-600">/{progressTracking.expectedLossPerWeek.toFixed(2)}</span> kg/Wo
-                  </span>
+                {/* Stats footer */}
+                <div className="border-t border-zinc-800/50 px-4 py-3 flex justify-between items-center bg-zinc-900/30">
+                  <div className="flex items-center gap-2">
+                    <Target size={13} className="text-zinc-600" />
+                    <span className="text-sm text-zinc-400">
+                      {progressTracking.projectedDate
+                        ? format(progressTracking.projectedDate, 'd. MMMM', { locale: de })
+                        : '–'}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-sm font-medium ${progressTracking.actualRatePerWeek >= progressTracking.expectedLossPerWeek ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {progressTracking.actualRatePerWeek.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-zinc-600 ml-1">/ {progressTracking.expectedLossPerWeek.toFixed(2)} kg/Wo</span>
+                  </div>
                 </div>
               </Card>
             </>
@@ -651,82 +700,85 @@ export default function TodayPage() {
 
         {/* Right Column - Meals */}
         <div className="lg:col-span-8">
-          {/* Day Toggle - Mobile */}
-          <div className="flex gap-2 mb-4 lg:hidden">
+          {/* Day Toggle - Mobile - Refined */}
+          <div className="flex gap-3 mb-4 lg:hidden">
             <button
               onClick={() => handleDayChange('A')}
-              className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border ${
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                 data.dayType === 'A'
-                  ? 'bg-white text-black border-white'
-                  : 'bg-transparent text-zinc-400 border-zinc-800 hover:border-zinc-700'
+                  ? 'bg-white text-black'
+                  : 'bg-zinc-900/50 text-zinc-500 hover:text-zinc-300'
               }`}
             >
               Tag A
             </button>
             <button
               onClick={() => handleDayChange('B')}
-              className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border ${
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                 data.dayType === 'B'
-                  ? 'bg-white text-black border-white'
-                  : 'bg-transparent text-zinc-400 border-zinc-800 hover:border-zinc-700'
+                  ? 'bg-white text-black'
+                  : 'bg-zinc-900/50 text-zinc-500 hover:text-zinc-300'
               }`}
             >
               Tag B
             </button>
           </div>
 
-          {/* Macros Summary - Mobile */}
-          <Card className="mb-4 p-4 lg:hidden">
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-sm font-medium">
+          {/* Macros Summary - Mobile - Elegant design */}
+          <Card className="mb-4 p-0 lg:hidden overflow-hidden">
+            {/* Header */}
+            <div className="flex justify-between items-center px-4 py-3 border-b border-zinc-800/50">
+              <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">
                 Makros {isViewingToday ? 'heute' : format(selectedDate, 'd.M.', { locale: de })}
               </span>
-              <span className="text-xs text-zinc-500">{completedCount}/{totalItems} Items</span>
+              <span className="text-xs text-zinc-600">{completedCount} / {totalItems}</span>
             </div>
-            <div className="grid grid-cols-4 gap-3">
-              <div>
-                <p className="text-[10px] text-zinc-500 mb-0.5">kcal</p>
-                <p className="text-base font-semibold">{totalConsumedCalories}</p>
-                <p className="text-[10px] text-zinc-600">/{plan.totals.calories}</p>
+            {/* Macros grid */}
+            <div className="grid grid-cols-4 divide-x divide-zinc-800/50">
+              <div className="p-3 text-center">
+                <span className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">kcal</span>
+                <p className="text-lg font-semibold tracking-tight mt-1">{totalConsumedCalories}</p>
+                <p className="text-[10px] text-zinc-600">von {plan.totals.calories}</p>
               </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 mb-0.5">Protein</p>
-                <p className="text-base font-semibold">{consumed.protein}g</p>
-                <p className="text-[10px] text-zinc-600">/{plan.totals.protein}g</p>
+              <div className="p-3 text-center">
+                <span className="text-[10px] uppercase tracking-wider text-emerald-500/70 font-medium">Protein</span>
+                <p className="text-lg font-semibold tracking-tight mt-1">{consumed.protein}<span className="text-xs text-zinc-500">g</span></p>
+                <p className="text-[10px] text-zinc-600">von {plan.totals.protein}g</p>
               </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 mb-0.5">Carbs</p>
-                <p className="text-base font-semibold">{consumed.carbs}g</p>
-                <p className="text-[10px] text-zinc-600">/{plan.totals.carbs}g</p>
+              <div className="p-3 text-center">
+                <span className="text-[10px] uppercase tracking-wider text-blue-400/70 font-medium">Carbs</span>
+                <p className="text-lg font-semibold tracking-tight mt-1">{consumed.carbs}<span className="text-xs text-zinc-500">g</span></p>
+                <p className="text-[10px] text-zinc-600">von {plan.totals.carbs}g</p>
               </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 mb-0.5">Fett</p>
-                <p className="text-base font-semibold">{consumed.fat}g</p>
-                <p className="text-[10px] text-zinc-600">/{plan.totals.fat}g</p>
+              <div className="p-3 text-center">
+                <span className="text-[10px] uppercase tracking-wider text-orange-400/70 font-medium">Fett</span>
+                <p className="text-lg font-semibold tracking-tight mt-1">{consumed.fat}<span className="text-xs text-zinc-500">g</span></p>
+                <p className="text-[10px] text-zinc-600">von {plan.totals.fat}g</p>
               </div>
             </div>
-            {/* Extra Calories */}
-            <div className="mt-3 pt-3 border-t border-zinc-800">
+            {/* Extra Calories - elegant footer */}
+            <div className="border-t border-zinc-800/50 px-4 py-3 bg-zinc-900/30">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-500">Extra kcal</span>
+                <span className="text-[11px] uppercase tracking-wider text-zinc-600 font-medium">Extra</span>
                 {showExtraInput ? (
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-2 items-center">
                     <input
                       type="number"
                       inputMode="numeric"
                       value={extraInput}
                       onChange={(e) => setExtraInput(e.target.value)}
                       placeholder="0"
-                      className="w-16 bg-zinc-800 border border-zinc-700 rounded px-2 py-0.5 text-xs text-right"
+                      className="w-20 bg-zinc-800/50 border border-zinc-700/50 rounded-md px-2 py-1 text-sm text-right font-medium"
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleExtraCalories();
                         if (e.key === 'Escape') { setShowExtraInput(false); setExtraInput(''); }
                       }}
                     />
+                    <span className="text-xs text-zinc-500">kcal</span>
                     <button
                       onClick={handleExtraCalories}
-                      className="bg-white text-black px-2 py-0.5 rounded text-xs font-medium"
+                      className="bg-white text-black px-3 py-1 rounded-md text-xs font-semibold"
                     >
                       OK
                     </button>
@@ -734,23 +786,24 @@ export default function TodayPage() {
                 ) : (
                   <button
                     onClick={() => { setShowExtraInput(true); setExtraInput(extraCalories.toString()); }}
-                    className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200"
+                    className="flex items-center gap-2 text-sm transition-colors"
                   >
                     {extraCalories > 0 ? (
-                      <span className="text-orange-500">+{extraCalories}</span>
+                      <span className="text-orange-400 font-medium">+{extraCalories} kcal</span>
                     ) : (
-                      <>
-                        <Plus size={12} />
-                        <span>Hinzufügen</span>
-                      </>
+                      <span className="text-zinc-500 hover:text-zinc-300 flex items-center gap-1">
+                        <Plus size={14} />
+                        <span className="text-xs">Hinzufügen</span>
+                      </span>
                     )}
                   </button>
                 )}
               </div>
             </div>
-            <div className="h-1 bg-zinc-800 rounded-full overflow-hidden mt-3">
+            {/* Progress indicator */}
+            <div className="h-0.5 bg-zinc-800/50">
               <div
-                className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                className="h-full bg-emerald-500/80 transition-all duration-500"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
