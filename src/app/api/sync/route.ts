@@ -37,16 +37,16 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await getSession();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const userId = session.user.id;
-  const dataPath = `users/${userId}/data.json`;
-
   try {
+    const session = await getSession();
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized - no session' }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+    const dataPath = `users/${userId}/data.json`;
+
     const data = await request.json();
     data.lastSync = new Date().toISOString();
     data.userId = userId;
@@ -59,6 +59,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, url: blob.url, lastSync: data.lastSync });
   } catch (error) {
     console.error('Blob POST error:', error);
-    return NextResponse.json({ error: 'Failed to save data' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to save: ${message}` }, { status: 500 });
   }
 }
