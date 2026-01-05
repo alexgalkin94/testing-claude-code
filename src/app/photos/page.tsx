@@ -102,9 +102,9 @@ export default function PhotosPage() {
 
   if (loading) {
     return (
-      <div className="p-4 animate-pulse">
-        <div className="h-8 bg-zinc-900 rounded w-1/2 mb-4"></div>
-        <div className="h-32 bg-zinc-900 rounded-xl mb-4"></div>
+      <div className="p-4 lg:p-8 lg:max-w-4xl animate-pulse space-y-4">
+        <div className="h-8 bg-zinc-900 rounded w-1/2"></div>
+        <div className="h-32 bg-zinc-900 rounded-xl"></div>
         <div className="grid grid-cols-3 gap-2">
           {[1, 2, 3].map(i => (
             <div key={i} className="aspect-[3/4] bg-zinc-900 rounded-xl"></div>
@@ -115,7 +115,7 @@ export default function PhotosPage() {
   }
 
   return (
-    <div className="p-4 pb-24">
+    <div className="p-4 pb-24 lg:p-8 lg:pb-8 lg:max-w-4xl">
       <div className="flex justify-between items-center mb-6">
         <div>
           <p className="text-zinc-500 text-sm">Dokumentiere deine Reise</p>

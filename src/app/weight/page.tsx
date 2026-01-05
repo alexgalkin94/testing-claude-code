@@ -36,7 +36,15 @@ export default function WeightPage() {
   };
 
   if (isLoading) {
-    return <div className="p-4 animate-pulse"><div className="h-64 bg-zinc-900 rounded-xl"></div></div>;
+    return (
+      <div className="p-4 lg:p-8 lg:max-w-3xl animate-pulse space-y-4">
+        <div className="h-8 bg-zinc-900 rounded w-1/2"></div>
+        <div className="grid grid-cols-3 gap-3">
+          {[1, 2, 3].map(i => <div key={i} className="h-16 bg-zinc-900 rounded-xl"></div>)}
+        </div>
+        <div className="h-56 bg-zinc-900 rounded-xl"></div>
+      </div>
+    );
   }
 
   const weights = data.weights;
@@ -54,7 +62,7 @@ export default function WeightPage() {
   const totalChange = firstWeight && latestWeight ? firstWeight - latestWeight : 0;
 
   return (
-    <div className="p-4 pb-24">
+    <div className="p-4 pb-24 lg:p-8 lg:pb-8 lg:max-w-3xl">
       <div className="flex justify-between items-center mb-6">
         <div>
           <p className="text-zinc-500 text-sm">Verfolge deinen Fortschritt</p>
