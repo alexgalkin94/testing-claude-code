@@ -54,6 +54,7 @@ export async function POST(request: Request) {
     const blob = await put(dataPath, JSON.stringify(data), {
       access: 'public',
       addRandomSuffix: false,
+      allowOverwrite: true,
     });
 
     return NextResponse.json({ success: true, url: blob.url, lastSync: data.lastSync });
