@@ -1,25 +1,27 @@
 import { put, list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
 
-const USER_ID = 'alex_cutboard';
-const DATA_PATH = `${USER_ID}/data.json`;
-const SESSION_COOKIE = 'cutboard_session';
-
-async function isAuthenticated(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const session = cookieStore.get(SESSION_COOKIE);
-  return !!session?.value;
+async function getSession() {
+  return await auth.api.getSession({
+    headers: await headers(),
+  });
 }
 
 export async function GET() {
-  if (!(await isAuthenticated())) {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const userId = session.user.id;
+  const dataPath = `users/${userId}/data.json`;
+
   try {
-    const { blobs } = await list({ prefix: USER_ID });
-    const dataBlob = blobs.find(b => b.pathname === DATA_PATH);
+    const { blobs } = await list({ prefix: `users/${userId}` });
+    const dataBlob = blobs.find(b => b.pathname === dataPath);
 
     if (!dataBlob) {
       return NextResponse.json(null);
@@ -35,15 +37,21 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAuthenticated())) {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const userId = session.user.id;
+  const dataPath = `users/${userId}/data.json`;
 
   try {
     const data = await request.json();
     data.lastSync = new Date().toISOString();
+    data.userId = userId;
 
-    const blob = await put(DATA_PATH, JSON.stringify(data), {
+    const blob = await put(dataPath, JSON.stringify(data), {
       access: 'public',
       addRandomSuffix: false,
     });

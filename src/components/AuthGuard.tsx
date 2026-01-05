@@ -1,52 +1,35 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { useSession } from '@/lib/auth-client';
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const [checking, setChecking] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
+  const { data: session, isPending } = useSession();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    checkAuth();
-  }, [pathname]);
-
-  const checkAuth = async () => {
-    // Skip auth check on login page
-    if (pathname === '/login') {
-      setChecking(false);
-      setAuthenticated(true);
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/auth');
-      const data = await response.json();
-
-      if (data.authenticated) {
-        setAuthenticated(true);
-      } else {
-        router.push('/login');
-      }
-    } catch (error) {
+    if (!isPending && !session && pathname !== '/login') {
       router.push('/login');
     }
+  }, [session, isPending, pathname, router]);
 
-    setChecking(false);
-  };
+  // Skip auth check on login page
+  if (pathname === '/login') {
+    return <>{children}</>;
+  }
 
-  if (checking) {
+  if (isPending) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f]">
-        <Loader2 size={32} className="animate-spin text-[#8b5cf6]" />
+      <div className="min-h-screen flex items-center justify-center bg-zinc-950">
+        <Loader2 size={32} className="animate-spin text-zinc-500" />
       </div>
     );
   }
 
-  if (!authenticated && pathname !== '/login') {
+  if (!session) {
     return null;
   }
 
