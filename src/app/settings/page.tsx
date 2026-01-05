@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, User, Target, Flame, Check, Cloud } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Save, User, Target, Flame, Check, Cloud, LogOut } from 'lucide-react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
+import { signOut, useSession } from '@/lib/auth-client';
 
 interface Profile {
   name: string;
@@ -31,6 +33,8 @@ const DEFAULT_PROFILE: Profile = {
 };
 
 export default function SettingsPage() {
+  const { data: session } = useSession();
+  const router = useRouter();
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -90,6 +94,12 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const handleLogout = async () => {
+    await signOut();
+    router.push('/login');
+    router.refresh();
+  };
+
   const updateField = (field: keyof Profile, value: string | number) => {
     setProfile(prev => ({ ...prev, [field]: value }));
   };
@@ -125,10 +135,27 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      {/* Profile */}
+      {/* Account */}
       <Card className="mb-4">
         <div className="flex items-center gap-2 mb-4">
           <User size={18} className="text-zinc-400" />
+          <h2 className="font-medium">Account</h2>
+        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-zinc-300">{session?.user?.name || 'User'}</p>
+            <p className="text-xs text-zinc-500">{session?.user?.email}</p>
+          </div>
+          <Button onClick={handleLogout} variant="danger" size="sm">
+            <LogOut size={14} className="mr-1" /> Logout
+          </Button>
+        </div>
+      </Card>
+
+      {/* Profile */}
+      <Card className="mb-4">
+        <div className="flex items-center gap-2 mb-4">
+          <Target size={18} className="text-zinc-400" />
           <h2 className="font-medium">Profil</h2>
         </div>
         <div className="space-y-4">

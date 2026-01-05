@@ -1,25 +1,27 @@
 import { put, list, del } from '@vercel/blob';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
 import { randomUUID } from 'crypto';
 
-const USER_ID = 'alex_cutboard';
-const PHOTOS_PREFIX = `${USER_ID}/photos/`;
-const SESSION_COOKIE = 'cutboard_session';
-
-async function isAuthenticated(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const session = cookieStore.get(SESSION_COOKIE);
-  return !!session?.value;
+async function getSession() {
+  return await auth.api.getSession({
+    headers: await headers(),
+  });
 }
 
 export async function GET() {
-  if (!(await isAuthenticated())) {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const userId = session.user.id;
+  const photosPrefix = `users/${userId}/photos/`;
+
   try {
-    const { blobs } = await list({ prefix: PHOTOS_PREFIX });
+    const { blobs } = await list({ prefix: photosPrefix });
 
     const photos = blobs.map(blob => {
       const filename = blob.pathname.split('/').pop() || '';
@@ -41,9 +43,14 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAuthenticated())) {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const userId = session.user.id;
+  const photosPrefix = `users/${userId}/photos/`;
 
   try {
     const formData = await request.formData();
@@ -57,7 +64,7 @@ export async function POST(request: Request) {
     // UUID for unguessable filename
     const uuid = randomUUID();
     const ext = file.name.split('.').pop() || 'jpg';
-    const filename = `${PHOTOS_PREFIX}${date}_${uuid}.${ext}`;
+    const filename = `${photosPrefix}${date}_${uuid}.${ext}`;
 
     const blob = await put(filename, file, {
       access: 'public',
@@ -76,9 +83,13 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!(await isAuthenticated())) {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const userId = session.user.id;
 
   try {
     const { url } = await request.json();
@@ -87,7 +98,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'No URL provided' }, { status: 400 });
     }
 
-    if (!url.includes(USER_ID)) {
+    // Check that the URL belongs to this user
+    if (!url.includes(`users/${userId}`)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
