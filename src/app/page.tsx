@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { format, subDays, addDays, isToday } from 'date-fns';
+import { format, subDays, addDays, isToday, differenceInDays } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Check, ChevronDown, Scale, Flame, TrendingDown, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff, Pencil } from 'lucide-react';
+import { Check, ChevronDown, Scale, Flame, TrendingDown, TrendingUp, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff, Pencil, Target } from 'lucide-react';
 import Card from '@/components/Card';
 import { useData } from '@/lib/data-store';
 import {
@@ -122,6 +122,51 @@ export default function TodayPage() {
     });
     return result;
   }, [plan.meals, checkedItems]);
+
+  // Smart progress tracking
+  const progressTracking = useMemo(() => {
+    const startDate = new Date(data.profile.startDate);
+    const today = new Date();
+    const daysElapsed = differenceInDays(today, startDate);
+
+    const totalToLose = data.profile.startWeight - data.profile.goalWeight;
+    const actualLoss = data.profile.startWeight - data.profile.currentWeight;
+
+    // Target rate: 0.5kg per week = 0.0714kg per day
+    const targetRatePerDay = 0.5 / 7;
+    const expectedLoss = daysElapsed * targetRatePerDay;
+    const expectedWeight = data.profile.startWeight - expectedLoss;
+
+    // Difference: positive = ahead, negative = behind
+    const difference = expectedWeight - data.profile.currentWeight;
+    const isAhead = difference > 0;
+
+    // Actual rate (kg per day)
+    const actualRatePerDay = daysElapsed > 0 ? actualLoss / daysElapsed : 0;
+    const actualRatePerWeek = actualRatePerDay * 7;
+
+    // Projected days to goal based on actual rate
+    const remainingToLose = data.profile.currentWeight - data.profile.goalWeight;
+    const projectedDaysRemaining = actualRatePerDay > 0 ? remainingToLose / actualRatePerDay : Infinity;
+    const projectedDate = actualRatePerDay > 0
+      ? addDays(today, Math.ceil(projectedDaysRemaining))
+      : null;
+
+    // Expected completion date at target rate
+    const expectedDaysTotal = totalToLose / targetRatePerDay;
+    const expectedDate = addDays(startDate, Math.ceil(expectedDaysTotal));
+
+    return {
+      daysElapsed,
+      expectedWeight,
+      difference: Math.abs(difference),
+      isAhead,
+      actualRatePerWeek,
+      projectedDate,
+      expectedDate,
+      remainingToLose,
+    };
+  }, [data.profile]);
 
   const isViewingToday = isToday(selectedDate);
 
@@ -245,10 +290,16 @@ export default function TodayPage() {
                 </Card>
                 <Card className="p-3">
                   <div className="flex items-center gap-2 mb-1">
-                    <Flame size={14} className={streak > 0 ? 'text-orange-500' : 'text-zinc-500'} />
-                    <span className="text-xs text-zinc-500">Streak</span>
+                    {progressTracking.isAhead ? (
+                      <TrendingUp size={14} className="text-emerald-500" />
+                    ) : (
+                      <TrendingDown size={14} className="text-red-500" />
+                    )}
+                    <span className="text-xs text-zinc-500">vs. Plan</span>
                   </div>
-                  <p className="text-lg font-semibold">{streak}<span className="text-xs text-zinc-500 ml-0.5">Tage</span></p>
+                  <p className={`text-lg font-semibold ${progressTracking.isAhead ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {progressTracking.isAhead ? '+' : '-'}{progressTracking.difference.toFixed(1)}<span className="text-xs ml-0.5">kg</span>
+                  </p>
                 </Card>
               </div>
 
@@ -313,12 +364,44 @@ export default function TodayPage() {
                   </Card>
                   <Card className="p-4">
                     <div className="flex items-center gap-3 mb-2">
-                      <Flame size={18} className={streak > 0 ? 'text-orange-500' : 'text-zinc-500'} />
-                      <span className="text-sm text-zinc-400">Streak</span>
+                      {progressTracking.isAhead ? (
+                        <TrendingUp size={18} className="text-emerald-500" />
+                      ) : (
+                        <TrendingDown size={18} className="text-red-500" />
+                      )}
+                      <span className="text-sm text-zinc-400">vs. Plan</span>
                     </div>
-                    <p className="text-2xl font-semibold">{streak} Tage</p>
+                    <p className={`text-2xl font-semibold ${progressTracking.isAhead ? 'text-emerald-500' : 'text-red-500'}`}>
+                      {progressTracking.isAhead ? '+' : '-'}{progressTracking.difference.toFixed(1)} kg
+                    </p>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      {progressTracking.isAhead ? 'voraus' : 'hinten'}
+                    </p>
                   </Card>
                 </div>
+
+                {/* Projected Completion */}
+                <Card className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Target size={16} className="text-zinc-400" />
+                        <span className="text-sm text-zinc-400">Ziel erreicht</span>
+                      </div>
+                      <p className="text-lg font-semibold">
+                        {progressTracking.projectedDate
+                          ? format(progressTracking.projectedDate, 'd. MMM yyyy', { locale: de })
+                          : '–'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-zinc-500 mb-1">Tempo</p>
+                      <p className="text-sm font-medium">
+                        {progressTracking.actualRatePerWeek.toFixed(2)} kg/Woche
+                      </p>
+                    </div>
+                  </div>
+                </Card>
 
                 {/* Progress to Goal */}
                 <Card className="p-5">
@@ -338,15 +421,26 @@ export default function TodayPage() {
 
               {/* Mobile Progress Bar */}
               <Card className="mb-6 p-4 lg:hidden">
-                <div className="flex justify-between items-center mb-3">
+                <div className="flex justify-between items-center mb-2">
                   <span className="text-sm text-zinc-400">Noch {remaining.toFixed(1)} kg zum Ziel</span>
                   <span className="text-xs text-zinc-500">{data.profile.goalWeight} kg</span>
                 </div>
-                <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-3">
                   <div
                     className="h-full bg-white rounded-full"
                     style={{ width: `${Math.min(100, (totalLoss / (data.profile.startWeight - data.profile.goalWeight)) * 100)}%` }}
                   />
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-zinc-500">
+                    <Target size={12} className="inline mr-1" />
+                    {progressTracking.projectedDate
+                      ? format(progressTracking.projectedDate, 'd. MMM', { locale: de })
+                      : '–'}
+                  </span>
+                  <span className="text-zinc-500">
+                    {progressTracking.actualRatePerWeek.toFixed(2)} kg/Wo
+                  </span>
                 </div>
               </Card>
             </>
