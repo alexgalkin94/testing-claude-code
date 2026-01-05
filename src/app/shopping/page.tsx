@@ -110,11 +110,24 @@ export default function ShoppingPage() {
   const checkedMain = mainItems.filter(i => checkedItems.has(i.id)).length;
 
   return (
-    <div className="p-4 pb-24">
+    <div className="p-4 pb-24 lg:p-8 lg:pb-8 lg:max-w-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <p className="text-zinc-500 text-sm">Einkaufen für</p>
+          <p className="text-zinc-500 text-sm">Deine Wocheneinkäufe</p>
+          <h1 className="text-xl font-semibold tracking-tight">Einkaufsliste</h1>
+        </div>
+        {checkedItems.size > 0 && (
+          <button onClick={resetList} className="p-2 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-800">
+            <RotateCcw size={20} />
+          </button>
+        )}
+      </div>
+
+      {/* Days Selector */}
+      <Card className="mb-6">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-zinc-400">Für wie viele Tage?</span>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setDays(d => Math.max(1, d - 1))}
@@ -122,22 +135,16 @@ export default function ShoppingPage() {
             >
               <Minus size={16} />
             </button>
-            <span className="text-2xl font-bold w-8 text-center">{days}</span>
+            <span className="text-xl font-bold w-6 text-center">{days}</span>
             <button
               onClick={() => setDays(d => Math.min(14, d + 1))}
               className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
             >
               <Plus size={16} />
             </button>
-            <span className="text-xl font-semibold text-zinc-400">Tage</span>
           </div>
         </div>
-        {checkedItems.size > 0 && (
-          <button onClick={resetList} className="p-2 text-zinc-500 hover:text-white">
-            <RotateCcw size={20} />
-          </button>
-        )}
-      </div>
+      </Card>
 
       {/* Progress */}
       {checkedMain > 0 && (
