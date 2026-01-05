@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { format, subDays, addDays, isToday } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Check, ChevronDown, Scale, Flame, TrendingDown, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff } from 'lucide-react';
+import { Check, ChevronDown, Scale, Flame, TrendingDown, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff, Pencil } from 'lucide-react';
 import Card from '@/components/Card';
 import { useData } from '@/lib/data-store';
 import {
@@ -77,7 +77,7 @@ export default function TodayPage() {
   const handleQuickWeight = () => {
     const weight = parseFloat(weightInput);
     if (!weight || weight < 30 || weight > 300) return;
-    addWeight(todayStr, weight);
+    addWeight(selectedDateStr, weight);
     setShowWeightInput(false);
     setWeightInput('');
   };
@@ -193,15 +193,21 @@ export default function TodayPage() {
             <>
               {/* Mobile Stats Row */}
               <div className="grid grid-cols-3 gap-3 mb-6 lg:hidden">
-                <button onClick={() => setShowWeightInput(!showWeightInput)} className="text-left">
-                  <Card className="p-3">
-                    <div className="flex items-center gap-2 mb-1">
+                <Card className="p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
                       <Scale size={14} className="text-zinc-500" />
                       <span className="text-xs text-zinc-500">Gewicht</span>
                     </div>
-                    <p className="text-lg font-semibold">{data.profile.currentWeight}<span className="text-xs text-zinc-500 ml-0.5">kg</span></p>
-                  </Card>
-                </button>
+                    <button
+                      onClick={() => setShowWeightInput(!showWeightInput)}
+                      className="p-1 -m-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  </div>
+                  <p className="text-lg font-semibold">{data.profile.currentWeight}<span className="text-xs text-zinc-500 ml-0.5">kg</span></p>
+                </Card>
                 <Card className="p-3">
                   <div className="flex items-center gap-2 mb-1">
                     <TrendingDown size={14} className="text-emerald-500" />
@@ -219,20 +225,21 @@ export default function TodayPage() {
               </div>
 
               {/* Desktop Stats Cards */}
-              <div className="hidden lg:block space-y-4">
-                <button onClick={() => setShowWeightInput(!showWeightInput)} className="w-full text-left">
-                  <Card className="p-5">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-zinc-400 mb-1">Aktuelles Gewicht</p>
-                        <p className="text-3xl font-semibold">{data.profile.currentWeight} <span className="text-lg text-zinc-500">kg</span></p>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center">
-                        <Scale size={24} className="text-zinc-400" />
-                      </div>
+              <div className="hidden lg:block space-y-4 mt-6">
+                <Card className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-zinc-400 mb-1">Aktuelles Gewicht</p>
+                      <p className="text-3xl font-semibold">{data.profile.currentWeight} <span className="text-lg text-zinc-500">kg</span></p>
                     </div>
-                  </Card>
-                </button>
+                    <button
+                      onClick={() => setShowWeightInput(!showWeightInput)}
+                      className="w-12 h-12 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition-colors"
+                    >
+                      <Pencil size={20} className="text-zinc-400" />
+                    </button>
+                  </div>
+                </Card>
 
                 <div className="grid grid-cols-2 gap-4">
                   <Card className="p-4">
@@ -270,7 +277,9 @@ export default function TodayPage() {
               {/* Quick Weight Input */}
               {showWeightInput && (
                 <Card className="mb-4 lg:mb-0 p-3 lg:p-4">
-                  <p className="text-sm text-zinc-400 mb-2 hidden lg:block">Gewicht eintragen</p>
+                  <p className="text-sm text-zinc-400 mb-2">
+                    Gewicht für {format(selectedDate, 'd. MMMM', { locale: de })} eintragen
+                  </p>
                   <div className="flex gap-2">
                     <input
                       type="number"
