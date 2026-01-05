@@ -113,12 +113,6 @@ export default function SettingsPage() {
         </div>
         <div className="space-y-4">
           <Input
-            label="Name"
-            value={profile.name}
-            onChange={(v) => updateField('name', v)}
-            placeholder="Dein Name"
-          />
-          <Input
             label="Start-Datum"
             type="date"
             value={profile.startDate}
@@ -137,6 +131,7 @@ export default function SettingsPage() {
           <Input
             label="Startgewicht"
             type="number"
+            inputMode="decimal"
             value={profile.startWeight.toString()}
             onChange={(v) => updateField('startWeight', parseFloat(v) || 0)}
             suffix="kg"
@@ -145,6 +140,7 @@ export default function SettingsPage() {
           <Input
             label="Aktuelles Gewicht"
             type="number"
+            inputMode="decimal"
             value={profile.currentWeight.toString()}
             onChange={(v) => updateField('currentWeight', parseFloat(v) || 0)}
             suffix="kg"
@@ -153,6 +149,7 @@ export default function SettingsPage() {
           <Input
             label="Zielgewicht"
             type="number"
+            inputMode="decimal"
             value={profile.goalWeight.toString()}
             onChange={(v) => updateField('goalWeight', parseFloat(v) || 0)}
             suffix="kg"
