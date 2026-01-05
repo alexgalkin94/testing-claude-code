@@ -199,14 +199,42 @@ export default function TodayPage() {
                       <Scale size={14} className="text-zinc-500" />
                       <span className="text-xs text-zinc-500">Gewicht</span>
                     </div>
-                    <button
-                      onClick={() => setShowWeightInput(!showWeightInput)}
-                      className="p-1 -m-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300"
-                    >
-                      <Pencil size={12} />
-                    </button>
+                    {!showWeightInput && (
+                      <button
+                        onClick={() => setShowWeightInput(true)}
+                        className="p-1 -m-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    )}
                   </div>
-                  <p className="text-lg font-semibold">{data.profile.currentWeight}<span className="text-xs text-zinc-500 ml-0.5">kg</span></p>
+                  {showWeightInput ? (
+                    <div className="flex gap-1.5 mt-1">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={weightInput}
+                        onChange={(e) => setWeightInput(e.target.value)}
+                        placeholder={data.profile.currentWeight.toString()}
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm"
+                        step="0.1"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleQuickWeight();
+                          if (e.key === 'Escape') { setShowWeightInput(false); setWeightInput(''); }
+                        }}
+                        onBlur={() => { if (!weightInput) { setShowWeightInput(false); } }}
+                      />
+                      <button
+                        onClick={handleQuickWeight}
+                        className="bg-white text-black px-2 py-1 rounded text-xs font-medium"
+                      >
+                        OK
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-lg font-semibold">{data.profile.currentWeight}<span className="text-xs text-zinc-500 ml-0.5">kg</span></p>
+                  )}
                 </Card>
                 <Card className="p-3">
                   <div className="flex items-center gap-2 mb-1">
@@ -228,16 +256,50 @@ export default function TodayPage() {
               <div className="hidden lg:block space-y-4 mt-6">
                 <Card className="p-5">
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm text-zinc-400 mb-1">Aktuelles Gewicht</p>
-                      <p className="text-3xl font-semibold">{data.profile.currentWeight} <span className="text-lg text-zinc-500">kg</span></p>
+                      {showWeightInput ? (
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            value={weightInput}
+                            onChange={(e) => setWeightInput(e.target.value)}
+                            placeholder={data.profile.currentWeight.toString()}
+                            className="w-32 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-2xl font-semibold"
+                            step="0.1"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleQuickWeight();
+                              if (e.key === 'Escape') { setShowWeightInput(false); setWeightInput(''); }
+                            }}
+                          />
+                          <span className="text-lg text-zinc-500">kg</span>
+                          <button
+                            onClick={handleQuickWeight}
+                            className="bg-white text-black px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200"
+                          >
+                            Speichern
+                          </button>
+                          <button
+                            onClick={() => { setShowWeightInput(false); setWeightInput(''); }}
+                            className="text-zinc-500 hover:text-zinc-300 px-2"
+                          >
+                            Abbrechen
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-3xl font-semibold">{data.profile.currentWeight} <span className="text-lg text-zinc-500">kg</span></p>
+                      )}
                     </div>
-                    <button
-                      onClick={() => setShowWeightInput(!showWeightInput)}
-                      className="w-12 h-12 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition-colors"
-                    >
-                      <Pencil size={20} className="text-zinc-400" />
-                    </button>
+                    {!showWeightInput && (
+                      <button
+                        onClick={() => setShowWeightInput(true)}
+                        className="w-12 h-12 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition-colors"
+                      >
+                        <Pencil size={20} className="text-zinc-400" />
+                      </button>
+                    )}
                   </div>
                 </Card>
 
@@ -273,33 +335,6 @@ export default function TodayPage() {
                   <p className="text-sm text-zinc-500">Noch {remaining.toFixed(1)} kg</p>
                 </Card>
               </div>
-
-              {/* Quick Weight Input */}
-              {showWeightInput && (
-                <Card className="mb-4 lg:mb-0 p-3 lg:p-4">
-                  <p className="text-sm text-zinc-400 mb-2">
-                    Gewicht für {format(selectedDate, 'd. MMMM', { locale: de })} eintragen
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      value={weightInput}
-                      onChange={(e) => setWeightInput(e.target.value)}
-                      placeholder={data.profile.currentWeight.toString()}
-                      className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm lg:text-base"
-                      step="0.1"
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleQuickWeight}
-                      className="bg-white text-black px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 transition-colors"
-                    >
-                      Speichern
-                    </button>
-                  </div>
-                </Card>
-              )}
 
               {/* Mobile Progress Bar */}
               <Card className="mb-6 p-4 lg:hidden">
