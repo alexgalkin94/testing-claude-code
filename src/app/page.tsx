@@ -132,9 +132,13 @@ export default function TodayPage() {
     const totalToLose = data.profile.startWeight - data.profile.goalWeight;
     const actualLoss = data.profile.startWeight - data.profile.currentWeight;
 
-    // Target rate: 0.5kg per week = 0.0714kg per day
-    const targetRatePerDay = 0.5 / 7;
-    const expectedLoss = daysElapsed * targetRatePerDay;
+    // Calculate expected loss rate from calorie deficit
+    // 1kg body fat ≈ 7700 kcal
+    const dailyDeficit = data.profile.tdee - data.profile.calorieTarget;
+    const expectedLossPerDay = dailyDeficit / 7700; // kg per day
+    const expectedLossPerWeek = expectedLossPerDay * 7;
+
+    const expectedLoss = daysElapsed * expectedLossPerDay;
     const expectedWeight = data.profile.startWeight - expectedLoss;
 
     // Difference: positive = ahead, negative = behind
@@ -152,8 +156,8 @@ export default function TodayPage() {
       ? addDays(today, Math.ceil(projectedDaysRemaining))
       : null;
 
-    // Expected completion date at target rate
-    const expectedDaysTotal = totalToLose / targetRatePerDay;
+    // Expected completion date at target deficit rate
+    const expectedDaysTotal = totalToLose / expectedLossPerDay;
     const expectedDate = addDays(startDate, Math.ceil(expectedDaysTotal));
 
     return {
@@ -162,6 +166,7 @@ export default function TodayPage() {
       difference: Math.abs(difference),
       isAhead,
       actualRatePerWeek,
+      expectedLossPerWeek,
       projectedDate,
       expectedDate,
       remainingToLose,
@@ -396,8 +401,11 @@ export default function TodayPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-zinc-500 mb-1">Tempo</p>
-                      <p className="text-sm font-medium">
-                        {progressTracking.actualRatePerWeek.toFixed(2)} kg/Woche
+                      <p className={`text-sm font-medium ${progressTracking.actualRatePerWeek >= progressTracking.expectedLossPerWeek ? 'text-emerald-500' : 'text-red-500'}`}>
+                        {progressTracking.actualRatePerWeek.toFixed(2)} kg/Wo
+                      </p>
+                      <p className="text-xs text-zinc-600">
+                        Soll: {progressTracking.expectedLossPerWeek.toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -438,8 +446,8 @@ export default function TodayPage() {
                       ? format(progressTracking.projectedDate, 'd. MMM', { locale: de })
                       : '–'}
                   </span>
-                  <span className="text-zinc-500">
-                    {progressTracking.actualRatePerWeek.toFixed(2)} kg/Wo
+                  <span className={progressTracking.actualRatePerWeek >= progressTracking.expectedLossPerWeek ? 'text-emerald-500' : 'text-red-500'}>
+                    {progressTracking.actualRatePerWeek.toFixed(2)}<span className="text-zinc-600">/{progressTracking.expectedLossPerWeek.toFixed(2)}</span> kg/Wo
                   </span>
                 </div>
               </Card>
