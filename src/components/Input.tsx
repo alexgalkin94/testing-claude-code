@@ -9,6 +9,7 @@ interface InputProps {
   min?: number;
   max?: number;
   step?: number;
+  inputMode?: 'none' | 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url';
 }
 
 export default function Input({
@@ -22,6 +23,7 @@ export default function Input({
   min,
   max,
   step,
+  inputMode,
 }: InputProps) {
   return (
     <div className={className}>
@@ -31,6 +33,7 @@ export default function Input({
       <div className="relative">
         <input
           type={type}
+          inputMode={inputMode}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}

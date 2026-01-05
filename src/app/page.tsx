@@ -274,6 +274,7 @@ export default function TodayPage() {
                   <div className="flex gap-2">
                     <input
                       type="number"
+                      inputMode="decimal"
                       value={weightInput}
                       onChange={(e) => setWeightInput(e.target.value)}
                       placeholder={data.profile.currentWeight.toString()}

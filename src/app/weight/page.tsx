@@ -77,6 +77,7 @@ export default function WeightPage() {
             <Input
               label="Gewicht"
               type="number"
+              inputMode="decimal"
               value={newWeight}
               onChange={setNewWeight}
               placeholder="85.5"
