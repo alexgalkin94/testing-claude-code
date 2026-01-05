@@ -1,119 +1,162 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, ShoppingCart, Minus, Plus } from 'lucide-react';
+import { Check, Minus, Plus, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import Card from '@/components/Card';
-import Button from '@/components/Button';
 
-interface ShoppingCategory {
+// Real package sizes you find in German supermarkets
+const PACKAGE_SIZES = {
+  // Protein - sold by package
+  chicken: { name: 'Hähnchenbrust', size: 500, unit: 'g', section: 'Kühlregal' },
+  turkey: { name: 'Putenbrust', size: 400, unit: 'g', section: 'Kühlregal' },
+  beef: { name: 'Rinderhack 5%', size: 400, unit: 'g', section: 'Kühlregal' },
+  pork: { name: 'Schweinefilet', size: 400, unit: 'g', section: 'Kühlregal' },
+  fish: { name: 'Fischfilet (TK)', size: 400, unit: 'g', section: 'Tiefkühl' },
+  shrimp: { name: 'Garnelen (TK)', size: 225, unit: 'g', section: 'Tiefkühl' },
+  tuna: { name: 'Thunfisch Dose', size: 150, unit: 'g', section: 'Konserven' },
+
+  // Eggs
+  eggs: { name: 'Eier', size: 10, unit: 'Stück', section: 'Kühlregal' },
+
+  // Dairy
+  skyr: { name: 'Skyr', size: 450, unit: 'g', section: 'Kühlregal' },
+  quark: { name: 'Magerquark', size: 500, unit: 'g', section: 'Kühlregal' },
+  exquisa: { name: 'Exquisa 0,2%', size: 200, unit: 'g', section: 'Kühlregal' },
+  cottage: { name: 'Körniger Frischkäse', size: 200, unit: 'g', section: 'Kühlregal' },
+
+  // Meat products
+  ham: { name: 'Backschinken', size: 100, unit: 'g', section: 'Kühlregal' }, // ~10 Scheiben
+
+  // Frozen
+  iglo: { name: 'Iglo Schlemmer-Filet', size: 1, unit: 'Stück', section: 'Tiefkühl' },
+  frosta: { name: 'Frosta Gemüsepfanne', size: 480, unit: 'g', section: 'Tiefkühl' },
+
+  // Carbs (often already at home)
+  potatoes: { name: 'Kartoffeln', size: 2000, unit: 'g', section: 'Gemüse' },
+  sweetpotatoes: { name: 'Süßkartoffeln', size: 1000, unit: 'g', section: 'Gemüse' },
+  rice: { name: 'Reis', size: 500, unit: 'g', section: 'Trockenwaren' },
+  pasta: { name: 'Nudeln', size: 500, unit: 'g', section: 'Trockenwaren' },
+  oats: { name: 'Haferflocken', size: 500, unit: 'g', section: 'Trockenwaren' },
+  bread: { name: 'Toast/Sandwiches', size: 10, unit: 'Stück', section: 'Brot' },
+};
+
+interface ShoppingItem {
   id: string;
-  name: string;
-  emoji: string;
-  description: string;
-  perDay: string;
-  items: {
-    id: string;
-    name: string;
-    note?: string;
-  }[];
-  calculateAmount: (days: number) => string;
+  needed: number; // packages needed
+  inCart: boolean;
 }
 
-const SHOPPING_CATEGORIES: ShoppingCategory[] = [
-  {
-    id: 'protein',
-    name: 'Protein',
-    emoji: '🥩',
-    description: 'Wähle nach Vorliebe - alle austauschbar',
-    perDay: '~400g (Mittag + Abend)',
-    items: [
-      { id: 'chicken', name: 'Hähnchenbrust' },
-      { id: 'turkey', name: 'Putenbrust' },
-      { id: 'beef', name: 'Rinderhack 5%' },
-      { id: 'fish', name: 'Weißfisch (Kabeljau, Pangasius)' },
-      { id: 'shrimp', name: 'Garnelen' },
-      { id: 'tuna', name: 'Thunfisch (Dose)', note: '1 Dose = 1 Portion' },
-      { id: 'pork', name: 'Schweinefilet' },
+// Calculate what you need for X days
+function calculateNeeds(days: number) {
+  // Daily needs based on meal plan
+  const dailyProteinGrams = 400; // ~200g lunch + ~200g dinner
+  const dailyEggs = 3;
+  const dailyDairyGrams = 200; // evening snack
+  const dailyExquisaGrams = 30;
+  const dailyHamSlices = 2; // ~20g
+  const dailyPotatoesGrams = 300;
+  const dailyCarbsGrams = 60; // rice/pasta alternative
+  const dailyOatsGrams = 80;
+
+  const totalProtein = days * dailyProteinGrams;
+  const totalEggs = days * dailyEggs;
+  const totalDairy = days * dailyDairyGrams;
+  const totalPotatoes = days * dailyPotatoesGrams;
+
+  return {
+    // MUST BUY (fresh, weekly)
+    weekly: [
+      {
+        category: 'Protein',
+        totalNeeded: `${(totalProtein / 1000).toFixed(1)}kg`,
+        note: 'Mix nach Angebot - alles austauschbar',
+        options: [
+          { id: 'chicken', packages: Math.ceil(totalProtein / PACKAGE_SIZES.chicken.size) },
+          { id: 'turkey', packages: Math.ceil(totalProtein / PACKAGE_SIZES.turkey.size) },
+          { id: 'beef', packages: Math.ceil(totalProtein / PACKAGE_SIZES.beef.size) },
+          { id: 'fish', packages: Math.ceil(totalProtein / PACKAGE_SIZES.fish.size) },
+          { id: 'shrimp', packages: Math.ceil(totalProtein / PACKAGE_SIZES.shrimp.size) },
+        ],
+      },
+      {
+        category: 'Eier',
+        totalNeeded: `${totalEggs} Stück`,
+        note: null,
+        options: [
+          { id: 'eggs', packages: Math.ceil(totalEggs / PACKAGE_SIZES.eggs.size) },
+        ],
+      },
+      {
+        category: 'Milchprodukte',
+        totalNeeded: `${(totalDairy / 1000).toFixed(1)}kg Skyr/Quark`,
+        note: 'Für Abend-Snack',
+        options: [
+          { id: 'skyr', packages: Math.ceil(totalDairy / PACKAGE_SIZES.skyr.size) },
+          { id: 'quark', packages: Math.ceil(totalDairy / PACKAGE_SIZES.quark.size) },
+        ],
+      },
+      {
+        category: 'Exquisa',
+        totalNeeded: `${days * dailyExquisaGrams}g`,
+        note: 'Fürs Rührei',
+        options: [
+          { id: 'exquisa', packages: Math.ceil((days * dailyExquisaGrams) / PACKAGE_SIZES.exquisa.size) },
+        ],
+      },
+      {
+        category: 'Schinken',
+        totalNeeded: `${days * dailyHamSlices} Scheiben`,
+        note: 'Fürs Frühstück',
+        options: [
+          { id: 'ham', packages: Math.ceil((days * dailyHamSlices * 10) / PACKAGE_SIZES.ham.size) },
+        ],
+      },
+      {
+        category: 'Kartoffeln',
+        totalNeeded: `${(totalPotatoes / 1000).toFixed(1)}kg`,
+        note: 'Oder Süßkartoffeln',
+        options: [
+          { id: 'potatoes', packages: Math.ceil(totalPotatoes / PACKAGE_SIZES.potatoes.size) },
+        ],
+      },
     ],
-    calculateAmount: (days) => `~${(days * 0.4).toFixed(1)}kg gesamt`,
-  },
-  {
-    id: 'eggs',
-    name: 'Eier',
-    emoji: '🥚',
-    description: '3 Eier pro Tag zum Frühstück',
-    perDay: '3 Stück',
-    items: [
-      { id: 'eggs', name: 'Eier (L)' },
+
+    // Frozen (lasts longer)
+    frozen: [
+      {
+        category: 'Iglo Schlemmer-Filet',
+        totalNeeded: `${Math.ceil(days / 2)} Stück`,
+        note: 'Für Tag A Mittag',
+        options: [
+          { id: 'iglo', packages: Math.ceil(days / 2) },
+        ],
+      },
+      {
+        category: 'Frosta Gemüsepfanne',
+        totalNeeded: `${Math.ceil(days * 0.8)} Packungen`,
+        note: 'Für Abendessen',
+        options: [
+          { id: 'frosta', packages: Math.ceil(days * 0.8) },
+        ],
+      },
     ],
-    calculateAmount: (days) => `${days * 3} Stück (${Math.ceil(days * 3 / 10)} Packungen à 10)`,
-  },
-  {
-    id: 'carbs',
-    name: 'Kohlenhydrate',
-    emoji: '🍚',
-    description: 'Mix nach Vorliebe für Frühstück + Mittag',
-    perDay: '~300g Kartoffeln ODER ~60g Reis/Nudeln + Frühstücks-Carbs',
-    items: [
-      { id: 'potatoes', name: 'Kartoffeln' },
-      { id: 'sweet-potatoes', name: 'Süßkartoffeln' },
-      { id: 'rice', name: 'Reis' },
-      { id: 'pasta', name: 'Nudeln' },
-      { id: 'oats', name: 'Haferflocken', note: '80g pro Tag' },
-      { id: 'bread', name: 'Toast / Sandwiches', note: '3 Stück pro Tag' },
+
+    // Check if needed (often already at home)
+    pantry: [
+      { id: 'rice', name: 'Reis', needed: days * dailyCarbsGrams > 500 },
+      { id: 'pasta', name: 'Nudeln', needed: days * dailyCarbsGrams > 500 },
+      { id: 'oats', name: 'Haferflocken', needed: days * dailyOatsGrams > 500 },
+      { id: 'bread', name: 'Toast/Sandwiches', needed: true },
     ],
-    calculateAmount: (days) => `Kartoffeln: ~${(days * 0.3).toFixed(1)}kg ODER Reis/Nudeln: ~${(days * 60)}g`,
-  },
-  {
-    id: 'dairy',
-    name: 'Milchprodukte',
-    emoji: '🥛',
-    description: 'Für Snack + Frühstück',
-    perDay: '~200g Skyr/Quark + 30g Exquisa',
-    items: [
-      { id: 'skyr', name: 'Skyr' },
-      { id: 'quark', name: 'Magerquark' },
-      { id: 'cottage', name: 'Körniger Frischkäse' },
-      { id: 'exquisa', name: 'Exquisa 0,2%' },
-      { id: 'whey', name: 'Whey Protein', note: '25-30g pro Portion' },
-    ],
-    calculateAmount: (days) => `Skyr/Quark: ~${(days * 0.2).toFixed(1)}kg, Exquisa: 1 Pack`,
-  },
-  {
-    id: 'frozen',
-    name: 'Tiefkühl',
-    emoji: '❄️',
-    description: 'Convenience für schnelle Mahlzeiten',
-    perDay: '1 Gemüsepfanne, ½ an Tag B',
-    items: [
-      { id: 'iglo', name: 'Iglo Schlemmer-Filet', note: 'Nur Tag A' },
-      { id: 'frosta', name: 'Frosta Gemüsepfanne 480g' },
-    ],
-    calculateAmount: (days) => {
-      const iglo = Math.ceil(days / 2);
-      const frosta = Math.ceil(days * 0.75);
-      return `Iglo: ${iglo} Stück, Frosta: ${frosta} Packungen`;
-    },
-  },
-  {
-    id: 'meat-products',
-    name: 'Fleischwaren',
-    emoji: '🥓',
-    description: 'Fürs Frühstück',
-    perDay: '2 Scheiben',
-    items: [
-      { id: 'ham', name: 'Backschinken' },
-    ],
-    calculateAmount: (days) => `${Math.ceil(days / 5)} Packung(en)`,
-  },
-];
+  };
+}
 
 export default function ShoppingPage() {
   const [days, setDays] = useState(7);
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(SHOPPING_CATEGORIES.map(c => c.id))
-  );
+  const [showPantry, setShowPantry] = useState(false);
+
+  const needs = calculateNeeds(days);
 
   const toggleItem = (id: string) => {
     setCheckedItems(prev => {
@@ -124,143 +167,214 @@ export default function ShoppingPage() {
     });
   };
 
-  const toggleCategory = (id: string) => {
-    setExpandedCategories(prev => {
+  const toggleCategory = (categoryOptions: { id: string }[]) => {
+    const allChecked = categoryOptions.every(o => checkedItems.has(o.id));
+    setCheckedItems(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      categoryOptions.forEach(o => {
+        if (allChecked) next.delete(o.id);
+        else next.add(o.id);
+      });
       return next;
     });
   };
 
-  const totalItems = SHOPPING_CATEGORIES.reduce((sum, cat) => sum + cat.items.length, 0);
-  const checkedCount = checkedItems.size;
+  const resetList = () => setCheckedItems(new Set());
+
+  const weeklyItems = needs.weekly.flatMap(c => c.options);
+  const frozenItems = needs.frozen.flatMap(c => c.options);
+  const allMainItems = [...weeklyItems, ...frozenItems];
+  const checkedMain = allMainItems.filter(i => checkedItems.has(i.id)).length;
+  const totalMain = allMainItems.length;
 
   return (
     <div className="p-4 pb-24">
       {/* Header */}
-      <div className="mb-6">
-        <p className="text-zinc-500 text-sm">Basierend auf deinem Ernährungsplan</p>
-        <h1 className="text-xl font-semibold tracking-tight">Einkaufsliste</h1>
-      </div>
-
-      {/* Days Selector */}
-      <Card className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium">Für wie viele Tage?</p>
-            <p className="text-sm text-zinc-500">Mengen werden berechnet</p>
-          </div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <p className="text-zinc-500 text-sm">Einkaufen für</p>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setDays(d => Math.max(1, d - 1))}
-              className="w-10 h-10 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
             >
-              <Minus size={18} />
+              <Minus size={16} />
             </button>
-            <span className="text-2xl font-semibold w-12 text-center">{days}</span>
+            <span className="text-2xl font-bold w-8 text-center">{days}</span>
             <button
               onClick={() => setDays(d => Math.min(14, d + 1))}
-              className="w-10 h-10 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
             >
-              <Plus size={18} />
+              <Plus size={16} />
             </button>
+            <span className="text-xl font-semibold text-zinc-400">Tage</span>
           </div>
         </div>
-      </Card>
-
-      {/* Progress */}
-      <Card className="mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <ShoppingCart className="text-zinc-400" size={20} />
-            <span className="text-sm text-zinc-400">Fortschritt</span>
-          </div>
-          <span className="text-sm font-medium">{checkedCount}/{totalItems}</span>
-        </div>
-        <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-3">
-          <div
-            className="h-full bg-white transition-all duration-300 rounded-full"
-            style={{ width: `${totalItems > 0 ? (checkedCount / totalItems) * 100 : 0}%` }}
-          />
-        </div>
-      </Card>
-
-      {/* Categories */}
-      <div className="space-y-4">
-        {SHOPPING_CATEGORIES.map(category => (
-          <Card key={category.id}>
-            {/* Category Header */}
-            <button
-              onClick={() => toggleCategory(category.id)}
-              className="w-full text-left"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{category.emoji}</span>
-                  <div>
-                    <h3 className="font-medium">{category.name}</h3>
-                    <p className="text-xs text-zinc-500">{category.description}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-emerald-500">
-                    {category.calculateAmount(days)}
-                  </p>
-                  <p className="text-xs text-zinc-600">{category.perDay}</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Items */}
-            {expandedCategories.has(category.id) && (
-              <div className="mt-4 pt-4 border-t border-zinc-800 space-y-2">
-                {category.items.map(item => (
-                  <div
-                    key={item.id}
-                    onClick={() => toggleItem(item.id)}
-                    className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all ${
-                      checkedItems.has(item.id)
-                        ? 'bg-emerald-500/10'
-                        : 'bg-zinc-800/50 hover:bg-zinc-800'
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
-                        checkedItems.has(item.id)
-                          ? 'bg-emerald-500 border-emerald-500 text-white'
-                          : 'bg-transparent border-zinc-700'
-                      }`}
-                    >
-                      {checkedItems.has(item.id) && <Check size={12} strokeWidth={3} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span
-                        className={`text-sm ${
-                          checkedItems.has(item.id) ? 'text-zinc-500 line-through' : ''
-                        }`}
-                      >
-                        {item.name}
-                      </span>
-                      {item.note && (
-                        <span className="text-xs text-zinc-600 ml-2">({item.note})</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        ))}
+        {checkedItems.size > 0 && (
+          <button onClick={resetList} className="p-2 text-zinc-500 hover:text-white">
+            <RotateCcw size={20} />
+          </button>
+        )}
       </div>
 
-      {/* Tips */}
-      <Card className="mt-6 bg-zinc-800/50 border-zinc-700">
-        <p className="text-sm text-zinc-300">
-          <strong>Tipp:</strong> Die Proteinquellen sind austauschbar. Kaufe was frisch ist oder im Angebot.
-          200g Hähnchen ≈ 225g Garnelen ≈ 275g Weißfisch ≈ 175g Rinderhack.
-        </p>
-      </Card>
+      {/* Progress */}
+      {checkedMain > 0 && (
+        <div className="mb-6">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-zinc-500">{checkedMain} von {totalMain}</span>
+            {checkedMain === totalMain && <span className="text-emerald-500">Fertig! ✓</span>}
+          </div>
+          <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-emerald-500 transition-all"
+              style={{ width: `${(checkedMain / totalMain) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Weekly Shopping */}
+      <div className="mb-6">
+        <h2 className="text-sm font-medium text-zinc-500 mb-3 uppercase tracking-wide">
+          🛒 Diese Woche kaufen
+        </h2>
+        <div className="space-y-2">
+          {needs.weekly.map(category => {
+            const isChecked = category.options.every(o => checkedItems.has(o.id));
+            const pkg = PACKAGE_SIZES[category.options[0].id as keyof typeof PACKAGE_SIZES];
+            const count = category.options[0].packages;
+
+            return (
+              <div
+                key={category.category}
+                onClick={() => toggleCategory(category.options)}
+                className={`flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all ${
+                  isChecked ? 'bg-emerald-500/10 opacity-60' : 'bg-zinc-900 hover:bg-zinc-800'
+                }`}
+              >
+                <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center ${
+                  isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600'
+                }`}>
+                  {isChecked && <Check size={14} className="text-white" strokeWidth={3} />}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between">
+                    <span className={`font-medium ${isChecked ? 'line-through text-zinc-500' : ''}`}>
+                      {category.category}
+                    </span>
+                    <span className={`text-lg font-bold ${isChecked ? 'text-zinc-600' : 'text-white'}`}>
+                      {count}×
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between mt-0.5">
+                    <span className="text-xs text-zinc-500">
+                      {category.note || `${pkg.size}${pkg.unit} Packung`}
+                    </span>
+                    <span className="text-xs text-zinc-500">
+                      {category.totalNeeded}
+                    </span>
+                  </div>
+                  {category.options.length > 1 && !isChecked && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {category.options.map(opt => {
+                        const p = PACKAGE_SIZES[opt.id as keyof typeof PACKAGE_SIZES];
+                        return (
+                          <span key={opt.id} className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                            {p.name}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Frozen */}
+      <div className="mb-6">
+        <h2 className="text-sm font-medium text-zinc-500 mb-3 uppercase tracking-wide">
+          ❄️ Tiefkühl
+        </h2>
+        <div className="space-y-2">
+          {needs.frozen.map(category => {
+            const isChecked = category.options.every(o => checkedItems.has(o.id));
+            const count = category.options[0].packages;
+
+            return (
+              <div
+                key={category.category}
+                onClick={() => toggleCategory(category.options)}
+                className={`flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all ${
+                  isChecked ? 'bg-emerald-500/10 opacity-60' : 'bg-zinc-900 hover:bg-zinc-800'
+                }`}
+              >
+                <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center ${
+                  isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600'
+                }`}>
+                  {isChecked && <Check size={14} className="text-white" strokeWidth={3} />}
+                </div>
+
+                <div className="flex-1">
+                  <div className="flex items-baseline justify-between">
+                    <span className={`font-medium ${isChecked ? 'line-through text-zinc-500' : ''}`}>
+                      {category.category}
+                    </span>
+                    <span className={`text-lg font-bold ${isChecked ? 'text-zinc-600' : 'text-white'}`}>
+                      {count}×
+                    </span>
+                  </div>
+                  <span className="text-xs text-zinc-500">{category.note}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Pantry Check */}
+      <div>
+        <button
+          onClick={() => setShowPantry(!showPantry)}
+          className="flex items-center gap-2 text-sm text-zinc-500 mb-3"
+        >
+          {showPantry ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          <span className="uppercase tracking-wide font-medium">Vorrat checken</span>
+          <span className="text-zinc-600">(hast du vielleicht noch)</span>
+        </button>
+
+        {showPantry && (
+          <div className="space-y-2">
+            {needs.pantry.map(item => {
+              const isChecked = checkedItems.has(`pantry-${item.id}`);
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => toggleItem(`pantry-${item.id}`)}
+                  className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
+                    isChecked ? 'bg-zinc-800/50 opacity-60' : 'bg-zinc-900/50 hover:bg-zinc-800/50'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                    isChecked ? 'bg-zinc-600 border-zinc-600' : 'border-zinc-700'
+                  }`}>
+                    {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+                  </div>
+                  <span className={`text-sm ${isChecked ? 'line-through text-zinc-600' : 'text-zinc-400'}`}>
+                    {item.name}
+                  </span>
+                  <span className="text-xs text-zinc-600 ml-auto">
+                    {isChecked ? 'Hab ich' : 'Brauche ich?'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
