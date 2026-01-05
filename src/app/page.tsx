@@ -432,22 +432,26 @@ export default function TodayPage() {
               </span>
               <span className="text-xs text-zinc-500">{completedCount}/{totalItems} Items</span>
             </div>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 gap-3">
               <div>
-                <p className="text-lg font-semibold">{consumed.calories}</p>
-                <p className="text-xs text-zinc-500">/{plan.totals.calories}</p>
+                <p className="text-[10px] text-zinc-500 mb-0.5">kcal</p>
+                <p className="text-base font-semibold">{consumed.calories}</p>
+                <p className="text-[10px] text-zinc-600">/{plan.totals.calories}</p>
               </div>
               <div>
-                <p className="text-lg font-semibold">{consumed.protein}</p>
-                <p className="text-xs text-zinc-500">/{plan.totals.protein}g</p>
+                <p className="text-[10px] text-zinc-500 mb-0.5">Protein</p>
+                <p className="text-base font-semibold">{consumed.protein}g</p>
+                <p className="text-[10px] text-zinc-600">/{plan.totals.protein}g</p>
               </div>
               <div>
-                <p className="text-lg font-semibold">{consumed.carbs}</p>
-                <p className="text-xs text-zinc-500">/{plan.totals.carbs}g</p>
+                <p className="text-[10px] text-zinc-500 mb-0.5">Carbs</p>
+                <p className="text-base font-semibold">{consumed.carbs}g</p>
+                <p className="text-[10px] text-zinc-600">/{plan.totals.carbs}g</p>
               </div>
               <div>
-                <p className="text-lg font-semibold">{consumed.fat}</p>
-                <p className="text-xs text-zinc-500">/{plan.totals.fat}g</p>
+                <p className="text-[10px] text-zinc-500 mb-0.5">Fett</p>
+                <p className="text-base font-semibold">{consumed.fat}g</p>
+                <p className="text-[10px] text-zinc-600">/{plan.totals.fat}g</p>
               </div>
             </div>
             <div className="h-1 bg-zinc-800 rounded-full overflow-hidden mt-4">
