@@ -266,7 +266,7 @@ export default function TodayPage() {
                             value={weightInput}
                             onChange={(e) => setWeightInput(e.target.value)}
                             placeholder={data.profile.currentWeight.toString()}
-                            className="w-32 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-2xl font-semibold"
+                            className="w-28 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xl font-semibold"
                             step="0.1"
                             autoFocus
                             onKeyDown={(e) => {
@@ -274,18 +274,18 @@ export default function TodayPage() {
                               if (e.key === 'Escape') { setShowWeightInput(false); setWeightInput(''); }
                             }}
                           />
-                          <span className="text-lg text-zinc-500">kg</span>
+                          <span className="text-zinc-500">kg</span>
                           <button
                             onClick={handleQuickWeight}
-                            className="bg-white text-black px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200"
+                            className="bg-white text-black px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-zinc-200"
                           >
-                            Speichern
+                            OK
                           </button>
                           <button
                             onClick={() => { setShowWeightInput(false); setWeightInput(''); }}
-                            className="text-zinc-500 hover:text-zinc-300 px-2"
+                            className="text-zinc-500 hover:text-zinc-300 text-sm"
                           >
-                            Abbrechen
+                            ✕
                           </button>
                         </div>
                       ) : (
