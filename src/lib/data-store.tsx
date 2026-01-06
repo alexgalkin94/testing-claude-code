@@ -29,8 +29,10 @@ export interface AppData {
   extraCalories: {
     [date: string]: number;
   };
-  // Current day type
-  dayType: 'A' | 'B';
+  // Day type per date (A or B)
+  dayTypes: {
+    [date: string]: 'A' | 'B';
+  };
   // Metadata
   lastSync?: string;
 }
@@ -49,7 +51,7 @@ const DEFAULT_DATA: AppData = {
   weights: [],
   checklist: {},
   extraCalories: {},
-  dayType: 'A',
+  dayTypes: {},
 };
 
 const LOCAL_STORAGE_KEY = 'cutboard_all_data';
@@ -64,7 +66,8 @@ interface DataContextType {
   toggleChecklistItem: (date: string, itemId: string) => void;
   setChecklistItems: (date: string, items: string[]) => void;
   setExtraCalories: (date: string, calories: number) => void;
-  setDayType: (type: 'A' | 'B') => void;
+  setDayType: (date: string, type: 'A' | 'B') => void;
+  getDayType: (date: string) => 'A' | 'B';
   forceSync: () => Promise<void>;
 }
 
@@ -260,10 +263,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }));
   }, [updateData]);
 
-  // Set day type
-  const setDayType = useCallback((type: 'A' | 'B') => {
-    updateData(prev => ({ ...prev, dayType: type }));
+  // Set day type for a specific date
+  const setDayType = useCallback((date: string, type: 'A' | 'B') => {
+    updateData(prev => ({
+      ...prev,
+      dayTypes: { ...prev.dayTypes, [date]: type },
+    }));
   }, [updateData]);
+
+  // Get day type for a specific date (defaults to 'A' if not set)
+  const getDayType = useCallback((date: string): 'A' | 'B' => {
+    return data.dayTypes?.[date] || 'A';
+  }, [data.dayTypes]);
 
   // Force sync
   const forceSync = useCallback(async () => {
@@ -282,6 +293,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setChecklistItems,
       setExtraCalories,
       setDayType,
+      getDayType,
       forceSync,
     }}>
       {children}

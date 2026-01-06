@@ -50,7 +50,6 @@ export default function WeightPage() {
 
   const weights = data.weights;
   const goalWeight = data.profile.goalWeight;
-  const plan = data.dayType === 'A' ? DAY_A : DAY_B;
 
   // TDEE Calculation
   const tdeeTracking = useMemo(() => {
@@ -99,8 +98,12 @@ export default function WeightPage() {
         const dayCheckedItems = data.checklist[dateStr] || [];
         const extraCals = data.extraCalories?.[dateStr] || 0;
 
+        // Get the plan for this specific date
+        const dayType = data.dayTypes?.[dateStr] || 'A';
+        const dayPlan = dayType === 'A' ? DAY_A : DAY_B;
+
         let dayCalories = extraCals;
-        plan.meals.forEach(meal => {
+        dayPlan.meals.forEach(meal => {
           meal.items.forEach(item => {
             if (dayCheckedItems.includes(item.id)) {
               dayCalories += item.calories;
@@ -140,7 +143,7 @@ export default function WeightPage() {
       weightsNeeded,
       weeklyTrend,
     };
-  }, [data.profile, data.weights, data.checklist, data.extraCalories, plan.meals]);
+  }, [data.profile, data.weights, data.checklist, data.extraCalories, data.dayTypes]);
 
   const movingAvg = getMovingAverage(weights);
   const chartData = weights.map((w, i) => ({

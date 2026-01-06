@@ -25,7 +25,7 @@ const MealIcon = ({ icon, className, size = 16 }: { icon: 'sunrise' | 'sun' | 's
 };
 
 export default function TodayPage() {
-  const { data, isLoading, isSyncing, lastSyncError, toggleChecklistItem, setChecklistItems, setExtraCalories, setDayType, addWeight } = useData();
+  const { data, isLoading, isSyncing, lastSyncError, toggleChecklistItem, setChecklistItems, setExtraCalories, setDayType, getDayType, addWeight } = useData();
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [showWeightInput, setShowWeightInput] = useState(false);
@@ -36,7 +36,10 @@ export default function TodayPage() {
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const plan: DayPlan = data.dayType === 'A' ? DAY_A : DAY_B;
+
+  // Get day type for selected date
+  const selectedDayType = getDayType(selectedDateStr);
+  const plan: DayPlan = selectedDayType === 'A' ? DAY_A : DAY_B;
 
   // Get extra calories for selected date
   const extraCalories = data.extraCalories?.[selectedDateStr] || 0;
@@ -67,7 +70,7 @@ export default function TodayPage() {
   };
 
   const handleDayChange = (type: 'A' | 'B') => {
-    setDayType(type);
+    setDayType(selectedDateStr, type);
   };
 
   const toggleExpanded = (itemId: string) => {
@@ -118,6 +121,20 @@ export default function TodayPage() {
   const completedCount = checkedItems.size;
   const totalItems = plan.meals.reduce((sum, meal) => sum + meal.items.length, 0);
   const progressPercent = totalItems > 0 ? (completedCount / totalItems) * 100 : 0;
+
+  // Get weight for selected date (or nearest previous weight)
+  const selectedDateWeight = useMemo(() => {
+    const exactMatch = data.weights.find(w => w.date === selectedDateStr);
+    if (exactMatch) return exactMatch.weight;
+
+    // Find the most recent weight before or on selected date
+    const weightsBeforeDate = data.weights
+      .filter(w => w.date <= selectedDateStr)
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    return weightsBeforeDate[0]?.weight || data.profile.startWeight;
+  }, [data.weights, selectedDateStr, data.profile.startWeight]);
+
   const totalLoss = data.profile.startWeight - data.profile.currentWeight;
   const remaining = data.profile.currentWeight - data.profile.goalWeight;
 
@@ -286,57 +303,56 @@ export default function TodayPage() {
             </button>
           </div>
 
-          {/* Stats - Only on Today */}
-          {isViewingToday && (
-            <>
-              {/* Mobile Stats Row - Elegant minimal design */}
-              <div className="mb-6 lg:hidden">
-                <Card className="p-0 overflow-hidden">
-                  <div className="grid grid-cols-3 divide-x divide-zinc-800/50">
-                    {/* Weight */}
-                    <div className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Gewicht</span>
-                        {!showWeightInput && (
-                          <button
-                            onClick={() => setShowWeightInput(true)}
-                            className="p-1 -m-1 text-zinc-600 hover:text-zinc-400 transition-colors"
-                          >
-                            <Pencil size={11} />
-                          </button>
-                        )}
-                      </div>
-                      {showWeightInput ? (
-                        <div className="space-y-2">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            value={weightInput}
-                            onChange={(e) => setWeightInput(e.target.value)}
-                            placeholder={data.profile.currentWeight.toString()}
-                            className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-md px-2 py-1.5 text-sm font-medium"
-                            step="0.1"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleQuickWeight();
-                              if (e.key === 'Escape') { setShowWeightInput(false); setWeightInput(''); }
-                            }}
-                            onBlur={() => { if (!weightInput) { setShowWeightInput(false); } }}
-                          />
-                          <button
-                            onClick={handleQuickWeight}
-                            className="w-full bg-white text-black py-1 rounded-md text-xs font-semibold"
-                          >
-                            Speichern
-                          </button>
-                        </div>
-                      ) : (
-                        <div>
-                          <span className="text-xl font-semibold tracking-tight">{data.profile.currentWeight}</span>
-                          <span className="text-sm text-zinc-500 ml-1">kg</span>
-                        </div>
+          {/* Stats */}
+          <>
+            {/* Mobile Stats Row - Elegant minimal design */}
+            <div className="mb-6 lg:hidden">
+              <Card className="p-0 overflow-hidden">
+                <div className="grid grid-cols-3 divide-x divide-zinc-800/50">
+                  {/* Weight */}
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Gewicht</span>
+                      {!showWeightInput && (
+                        <button
+                          onClick={() => setShowWeightInput(true)}
+                          className="p-1 -m-1 text-zinc-600 hover:text-zinc-400 transition-colors"
+                        >
+                          <Pencil size={11} />
+                        </button>
                       )}
                     </div>
+                    {showWeightInput ? (
+                      <div className="space-y-2">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          value={weightInput}
+                          onChange={(e) => setWeightInput(e.target.value)}
+                          placeholder={selectedDateWeight.toString()}
+                          className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-md px-2 py-1.5 text-sm font-medium"
+                          step="0.1"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleQuickWeight();
+                            if (e.key === 'Escape') { setShowWeightInput(false); setWeightInput(''); }
+                          }}
+                          onBlur={() => { if (!weightInput) { setShowWeightInput(false); } }}
+                        />
+                        <button
+                          onClick={handleQuickWeight}
+                          className="w-full bg-white text-black py-1 rounded-md text-xs font-semibold"
+                        >
+                          Speichern
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <span className="text-xl font-semibold tracking-tight">{selectedDateWeight}</span>
+                        <span className="text-sm text-zinc-500 ml-1">kg</span>
+                      </div>
+                    )}
+                  </div>
                     {/* Lost */}
                     <div className="p-4">
                       <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium block mb-2">Verloren</span>
@@ -366,7 +382,9 @@ export default function TodayPage() {
                 <Card className="p-5">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <p className="text-sm text-zinc-400 mb-1">Aktuelles Gewicht</p>
+                      <p className="text-sm text-zinc-400 mb-1">
+                        Gewicht {isViewingToday ? '' : `am ${format(selectedDate, 'd.M.', { locale: de })}`}
+                      </p>
                       {showWeightInput ? (
                         <div className="flex gap-2 items-center">
                           <input
@@ -374,7 +392,7 @@ export default function TodayPage() {
                             inputMode="decimal"
                             value={weightInput}
                             onChange={(e) => setWeightInput(e.target.value)}
-                            placeholder={data.profile.currentWeight.toString()}
+                            placeholder={selectedDateWeight.toString()}
                             className="w-28 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xl font-semibold"
                             step="0.1"
                             autoFocus
@@ -398,7 +416,7 @@ export default function TodayPage() {
                           </button>
                         </div>
                       ) : (
-                        <p className="text-3xl font-semibold">{data.profile.currentWeight} <span className="text-lg text-zinc-500">kg</span></p>
+                        <p className="text-3xl font-semibold">{selectedDateWeight} <span className="text-lg text-zinc-500">kg</span></p>
                       )}
                     </div>
                     {!showWeightInput && (
@@ -526,8 +544,7 @@ export default function TodayPage() {
                 </div>
               </Card>
 
-            </>
-          )}
+          </>
 
           {/* Day Toggle - Desktop Only */}
           <div className="hidden lg:block">
@@ -537,7 +554,7 @@ export default function TodayPage() {
                 <button
                   onClick={() => handleDayChange('A')}
                   className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border transition-all ${
-                    data.dayType === 'A'
+                    selectedDayType === 'A'
                       ? 'bg-white text-black border-white'
                       : 'bg-transparent text-zinc-400 border-zinc-700 hover:border-zinc-600'
                   }`}
@@ -547,7 +564,7 @@ export default function TodayPage() {
                 <button
                   onClick={() => handleDayChange('B')}
                   className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border transition-all ${
-                    data.dayType === 'B'
+                    selectedDayType === 'B'
                       ? 'bg-white text-black border-white'
                       : 'bg-transparent text-zinc-400 border-zinc-700 hover:border-zinc-600'
                   }`}
@@ -626,7 +643,7 @@ export default function TodayPage() {
             <button
               onClick={() => handleDayChange('A')}
               className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                data.dayType === 'A'
+                selectedDayType === 'A'
                   ? 'bg-white text-black'
                   : 'bg-zinc-900/50 text-zinc-500 hover:text-zinc-300'
               }`}
@@ -636,7 +653,7 @@ export default function TodayPage() {
             <button
               onClick={() => handleDayChange('B')}
               className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                data.dayType === 'B'
+                selectedDayType === 'B'
                   ? 'bg-white text-black'
                   : 'bg-zinc-900/50 text-zinc-500 hover:text-zinc-300'
               }`}
