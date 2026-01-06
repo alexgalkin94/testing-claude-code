@@ -341,8 +341,10 @@ export default function TodayPage() {
                     <div className="p-4">
                       <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium block mb-2">Verloren</span>
                       <div>
-                        <span className="text-xl font-semibold tracking-tight text-emerald-400">−{totalLoss.toFixed(1)}</span>
-                        <span className="text-sm text-emerald-400/70 ml-1">kg</span>
+                        <span className={`text-xl font-semibold tracking-tight ${totalLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {totalLoss >= 0 ? '−' : '+'}{Math.abs(totalLoss).toFixed(1)}
+                        </span>
+                        <span className={`text-sm ml-1 ${totalLoss >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>kg</span>
                       </div>
                     </div>
                     {/* vs Plan */}
@@ -416,7 +418,9 @@ export default function TodayPage() {
                       <TrendingDown size={18} className="text-emerald-500" />
                       <span className="text-sm text-zinc-400">Verloren</span>
                     </div>
-                    <p className="text-2xl font-semibold text-emerald-500">-{totalLoss.toFixed(1)} kg</p>
+                    <p className={`text-2xl font-semibold ${totalLoss >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                      {totalLoss >= 0 ? '-' : '+'}{Math.abs(totalLoss).toFixed(1)} kg
+                    </p>
                   </Card>
                   <Card className="p-4">
                     <div className="flex items-center gap-3 mb-2">
@@ -471,7 +475,7 @@ export default function TodayPage() {
                   <div className="h-2 bg-zinc-800 rounded-full overflow-hidden mb-2">
                     <div
                       className="h-full bg-white rounded-full"
-                      style={{ width: `${Math.min(100, (totalLoss / (data.profile.startWeight - data.profile.goalWeight)) * 100)}%` }}
+                      style={{ width: `${Math.max(0, Math.min(100, (totalLoss / (data.profile.startWeight - data.profile.goalWeight)) * 100))}%` }}
                     />
                   </div>
                   <p className="text-sm text-zinc-500">Noch {remaining.toFixed(1)} kg</p>
@@ -499,7 +503,7 @@ export default function TodayPage() {
                   <div className="h-1 bg-zinc-800/50 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-zinc-400 to-white rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, (totalLoss / (data.profile.startWeight - data.profile.goalWeight)) * 100)}%` }}
+                      style={{ width: `${Math.max(0, Math.min(100, (totalLoss / (data.profile.startWeight - data.profile.goalWeight)) * 100))}%` }}
                     />
                   </div>
                 </div>
