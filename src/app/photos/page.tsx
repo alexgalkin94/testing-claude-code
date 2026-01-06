@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Camera, Trash2, ArrowLeftRight, X, Cloud, Loader2 } from 'lucide-react';
+import { Camera, Trash2, ArrowLeftRight, X, Cloud, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 
@@ -14,6 +14,273 @@ interface Photo {
   uploadedAt: string;
 }
 
+// Body outline SVG component for camera overlay
+function BodyOutline() {
+  return (
+    <svg
+      viewBox="0 0 200 400"
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      style={{ opacity: 0.4 }}
+    >
+      {/* Head */}
+      <ellipse cx="100" cy="45" rx="25" ry="30" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
+      {/* Neck */}
+      <path d="M 90 75 L 90 90 L 110 90 L 110 75" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
+      {/* Shoulders */}
+      <path d="M 90 90 Q 60 95, 40 115" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
+      <path d="M 110 90 Q 140 95, 160 115" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
+      {/* Torso */}
+      <path d="M 40 115 L 45 200 Q 50 230, 60 250" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
+      <path d="M 160 115 L 155 200 Q 150 230, 140 250" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
+      {/* Waist to hips */}
+      <path d="M 60 250 Q 80 260, 100 260 Q 120 260, 140 250" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
+      {/* Arms - Left */}
+      <path d="M 40 115 Q 25 150, 25 200 Q 25 250, 30 280" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
+      {/* Arms - Right */}
+      <path d="M 160 115 Q 175 150, 175 200 Q 175 250, 170 280" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
+      {/* Legs - Left */}
+      <path d="M 70 260 Q 65 300, 60 340 L 55 385" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
+      {/* Legs - Right */}
+      <path d="M 130 260 Q 135 300, 140 340 L 145 385" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
+      {/* Center line guide */}
+      <line x1="100" y1="10" x2="100" y2="390" stroke="white" strokeWidth="1" strokeDasharray="4 8" opacity="0.3" />
+    </svg>
+  );
+}
+
+// Camera component with body outline overlay
+function CameraWithOverlay({ onCapture, onClose }: { onCapture: (file: File) => void; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    startCamera();
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1080 }, height: { ideal: 1920 } }
+      });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (err) {
+      console.error('Camera error:', err);
+      setError('Kamera konnte nicht gestartet werden');
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0);
+
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], `progress-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        onCapture(file);
+      }
+    }, 'image/jpeg', 0.9);
+  };
+
+  if (error) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">{error}</p>
+          <Button onClick={onClose}>Schließen</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className="w-full h-full object-cover"
+      />
+      <BodyOutline />
+      <canvas ref={canvasRef} className="hidden" />
+
+      {/* Controls */}
+      <div className="absolute bottom-0 left-0 right-0 p-6 flex items-center justify-center gap-8">
+        <button
+          onClick={onClose}
+          className="w-12 h-12 rounded-full bg-zinc-800/80 flex items-center justify-center"
+        >
+          <X size={24} />
+        </button>
+        <button
+          onClick={capturePhoto}
+          className="w-20 h-20 rounded-full bg-white flex items-center justify-center"
+        >
+          <div className="w-16 h-16 rounded-full border-4 border-black" />
+        </button>
+        <div className="w-12" /> {/* Spacer for balance */}
+      </div>
+
+      {/* Hint */}
+      <div className="absolute top-8 left-0 right-0 text-center">
+        <p className="text-white/60 text-sm">Positioniere dich im Umriss</p>
+      </div>
+    </div>
+  );
+}
+
+// Zoomable image viewer component
+function ZoomableImage({ src, alt }: { src: string; alt: string }) {
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [lastTap, setLastTap] = useState(0);
+  const [initialDistance, setInitialDistance] = useState<number | null>(null);
+  const [initialScale, setInitialScale] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    setScale(prev => Math.min(Math.max(prev * delta, 1), 5));
+  }, []);
+
+  const handleDoubleClick = useCallback(() => {
+    if (scale > 1) {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    } else {
+      setScale(2.5);
+    }
+  }, [scale]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      setInitialDistance(distance);
+      setInitialScale(scale);
+    } else if (e.touches.length === 1) {
+      const now = Date.now();
+      if (now - lastTap < 300) {
+        handleDoubleClick();
+      }
+      setLastTap(now);
+
+      if (scale > 1) {
+        setIsDragging(true);
+        setDragStart({
+          x: e.touches[0].clientX - position.x,
+          y: e.touches[0].clientY - position.y
+        });
+      }
+    }
+  }, [scale, lastTap, position, handleDoubleClick]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && initialDistance !== null) {
+      e.preventDefault();
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const newScale = Math.min(Math.max((distance / initialDistance) * initialScale, 1), 5);
+      setScale(newScale);
+      if (newScale === 1) {
+        setPosition({ x: 0, y: 0 });
+      }
+    } else if (isDragging && e.touches.length === 1) {
+      setPosition({
+        x: e.touches[0].clientX - dragStart.x,
+        y: e.touches[0].clientY - dragStart.y
+      });
+    }
+  }, [initialDistance, initialScale, isDragging, dragStart]);
+
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false);
+    setInitialDistance(null);
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (scale > 1) {
+      setIsDragging(true);
+      setDragStart({
+        x: e.clientX - position.x,
+        y: e.clientY - position.y
+      });
+    }
+  }, [scale, position]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (isDragging) {
+      setPosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y
+      });
+    }
+  }, [isDragging, dragStart]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full flex items-center justify-center overflow-hidden touch-none"
+      onWheel={handleWheel}
+      onDoubleClick={handleDoubleClick}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
+      <img
+        src={src}
+        alt={alt}
+        className="max-w-full max-h-[80vh] object-contain rounded-xl select-none"
+        style={{
+          transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+          transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+          cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in'
+        }}
+        draggable={false}
+      />
+      {/* Zoom indicator */}
+      {scale > 1 && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-black/60 px-3 py-1 rounded-full text-sm">
+          {Math.round(scale * 100)}%
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PhotosPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +288,7 @@ export default function PhotosPage() {
   const [compareMode, setCompareMode] = useState(false);
   const [comparePhotos, setComparePhotos] = useState<[Photo | null, Photo | null]>([null, null]);
   const [showViewer, setShowViewer] = useState<Photo | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
 
   useEffect(() => {
     loadPhotos();
@@ -40,10 +308,7 @@ export default function PhotosPage() {
     setLoading(false);
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const uploadPhoto = async (file: File) => {
     setUploading(true);
     try {
       const formData = new FormData();
@@ -62,7 +327,18 @@ export default function PhotosPage() {
       console.error('Upload failed:', error);
     }
     setUploading(false);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadPhoto(file);
     e.target.value = '';
+  };
+
+  const handleCameraCapture = async (file: File) => {
+    setShowCamera(false);
+    await uploadPhoto(file);
   };
 
   const handleDelete = async (photo: Photo) => {
@@ -178,35 +454,54 @@ export default function PhotosPage() {
         </Card>
       )}
 
-      {/* Add Photo Button */}
+      {/* Add Photo Buttons */}
       {!compareMode && (
-        <label className="cursor-pointer block mb-4">
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handleFileSelect}
-            disabled={uploading}
-          />
-          <Card className="text-center py-6 hover:bg-zinc-800/50 border-dashed border-2 border-zinc-800">
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {/* Camera with overlay */}
+          <Card
+            className="text-center py-6 hover:bg-zinc-800/50 border-dashed border-2 border-zinc-800 cursor-pointer"
+            onClick={() => !uploading && setShowCamera(true)}
+          >
             {uploading ? (
               <>
-                <Loader2 size={32} className="mx-auto mb-2 text-zinc-400 animate-spin" />
-                <p className="text-sm text-zinc-400">Wird hochgeladen...</p>
+                <Loader2 size={28} className="mx-auto mb-2 text-zinc-400 animate-spin" />
+                <p className="text-sm text-zinc-400">Hochladen...</p>
               </>
             ) : (
               <>
-                <Camera size={32} className="mx-auto mb-2 text-zinc-400" />
-                <p className="font-medium">Foto aufnehmen</p>
-                <p className="text-xs text-zinc-500 mt-1">
-                  <Cloud size={12} className="inline mr-1" />
-                  Wird in der Cloud gespeichert
-                </p>
+                <Camera size={28} className="mx-auto mb-2 text-zinc-400" />
+                <p className="font-medium text-sm">Mit Overlay</p>
+                <p className="text-xs text-zinc-500 mt-1">Körperumriss</p>
               </>
             )}
           </Card>
-        </label>
+
+          {/* File picker / quick photo */}
+          <label className="cursor-pointer block">
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleFileSelect}
+              disabled={uploading}
+            />
+            <Card className="text-center py-6 hover:bg-zinc-800/50 border-dashed border-2 border-zinc-800 h-full flex flex-col items-center justify-center">
+              {uploading ? (
+                <>
+                  <Loader2 size={28} className="mx-auto mb-2 text-zinc-400 animate-spin" />
+                  <p className="text-sm text-zinc-400">Hochladen...</p>
+                </>
+              ) : (
+                <>
+                  <Cloud size={28} className="mx-auto mb-2 text-zinc-400" />
+                  <p className="font-medium text-sm">Schnellfoto</p>
+                  <p className="text-xs text-zinc-500 mt-1">Ohne Overlay</p>
+                </>
+              )}
+            </Card>
+          </label>
+        </div>
       )}
 
       {/* Photo Grid */}
@@ -249,34 +544,42 @@ export default function PhotosPage() {
         </Card>
       )}
 
-      {/* Photo Viewer Modal */}
+      {/* Photo Viewer Modal with Zoom */}
       {showViewer && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center">
           <button
             onClick={() => setShowViewer(null)}
-            className="absolute top-4 right-4 p-2 text-white"
+            className="absolute top-4 right-4 p-2 text-white z-10"
           >
             <X size={24} />
           </button>
           <button
             onClick={() => handleDelete(showViewer)}
-            className="absolute top-4 left-4 p-2 text-red-400"
+            className="absolute top-4 left-4 p-2 text-red-400 z-10"
           >
             <Trash2 size={24} />
           </button>
-          <img
+          <ZoomableImage
             src={showViewer.url}
             alt="Fortschrittsfoto"
-            className="max-w-full max-h-[80vh] object-contain rounded-xl"
           />
-          <div className="absolute bottom-8 left-0 right-0 text-center">
+          <div className="absolute bottom-8 left-0 right-0 text-center pointer-events-none">
             <p className="text-zinc-400 text-sm">
               {showViewer.date && showViewer.date !== 'Unbekannt'
                 ? format(new Date(showViewer.date), 'd. MMMM yyyy', { locale: de })
                 : ''}
             </p>
+            <p className="text-zinc-600 text-xs mt-1">Doppeltippen oder Pinch zum Zoomen</p>
           </div>
         </div>
+      )}
+
+      {/* Camera with Body Overlay */}
+      {showCamera && (
+        <CameraWithOverlay
+          onCapture={handleCameraCapture}
+          onClose={() => setShowCamera(false)}
+        />
       )}
     </div>
   );
