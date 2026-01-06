@@ -14,36 +14,70 @@ interface Photo {
   uploadedAt: string;
 }
 
-// Body outline SVG component for camera overlay
+// Body outline SVG component for camera overlay - clean minimal design
 function BodyOutline() {
   return (
     <svg
-      viewBox="0 0 200 400"
+      viewBox="0 0 100 220"
       className="absolute inset-0 w-full h-full pointer-events-none"
-      style={{ opacity: 0.4 }}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ opacity: 0.5, padding: '10%' }}
     >
-      {/* Head */}
-      <ellipse cx="100" cy="45" rx="25" ry="30" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
+      {/* Head - simple circle */}
+      <circle cx="50" cy="18" r="12" fill="none" stroke="white" strokeWidth="1.5" strokeDasharray="4 2" />
+
       {/* Neck */}
-      <path d="M 90 75 L 90 90 L 110 90 L 110 75" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
-      {/* Shoulders */}
-      <path d="M 90 90 Q 60 95, 40 115" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
-      <path d="M 110 90 Q 140 95, 160 115" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
-      {/* Torso */}
-      <path d="M 40 115 L 45 200 Q 50 230, 60 250" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
-      <path d="M 160 115 L 155 200 Q 150 230, 140 250" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
-      {/* Waist to hips */}
-      <path d="M 60 250 Q 80 260, 100 260 Q 120 260, 140 250" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
-      {/* Arms - Left */}
-      <path d="M 40 115 Q 25 150, 25 200 Q 25 250, 30 280" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
-      {/* Arms - Right */}
-      <path d="M 160 115 Q 175 150, 175 200 Q 175 250, 170 280" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
-      {/* Legs - Left */}
-      <path d="M 70 260 Q 65 300, 60 340 L 55 385" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
-      {/* Legs - Right */}
-      <path d="M 130 260 Q 135 300, 140 340 L 145 385" fill="none" stroke="white" strokeWidth="2" strokeDasharray="8 4" />
-      {/* Center line guide */}
-      <line x1="100" y1="10" x2="100" y2="390" stroke="white" strokeWidth="1" strokeDasharray="4 8" opacity="0.3" />
+      <line x1="50" y1="30" x2="50" y2="38" stroke="white" strokeWidth="1.5" strokeDasharray="4 2" />
+
+      {/* Shoulders - horizontal line */}
+      <line x1="25" y1="42" x2="75" y2="42" stroke="white" strokeWidth="1.5" strokeDasharray="4 2" />
+
+      {/* Torso outline */}
+      <path
+        d="M 25 42 L 22 100 Q 22 115, 30 125 L 35 130"
+        fill="none" stroke="white" strokeWidth="1.5" strokeDasharray="4 2"
+      />
+      <path
+        d="M 75 42 L 78 100 Q 78 115, 70 125 L 65 130"
+        fill="none" stroke="white" strokeWidth="1.5" strokeDasharray="4 2"
+      />
+
+      {/* Waist/Hip line */}
+      <path
+        d="M 35 130 Q 50 135, 65 130"
+        fill="none" stroke="white" strokeWidth="1.5" strokeDasharray="4 2"
+      />
+
+      {/* Left leg */}
+      <path
+        d="M 38 130 L 35 175 L 32 210"
+        fill="none" stroke="white" strokeWidth="1.5" strokeDasharray="4 2"
+      />
+
+      {/* Right leg */}
+      <path
+        d="M 62 130 L 65 175 L 68 210"
+        fill="none" stroke="white" strokeWidth="1.5" strokeDasharray="4 2"
+      />
+
+      {/* Left arm */}
+      <path
+        d="M 25 42 L 15 75 L 10 110"
+        fill="none" stroke="white" strokeWidth="1.5" strokeDasharray="4 2"
+      />
+
+      {/* Right arm */}
+      <path
+        d="M 75 42 L 85 75 L 90 110"
+        fill="none" stroke="white" strokeWidth="1.5" strokeDasharray="4 2"
+      />
+
+      {/* Center alignment line */}
+      <line x1="50" y1="0" x2="50" y2="220" stroke="white" strokeWidth="0.5" strokeDasharray="2 6" opacity="0.3" />
+
+      {/* Horizontal guides */}
+      <line x1="0" y1="42" x2="100" y2="42" stroke="white" strokeWidth="0.5" strokeDasharray="2 6" opacity="0.2" />
+      <line x1="0" y1="130" x2="100" y2="130" stroke="white" strokeWidth="0.5" strokeDasharray="2 6" opacity="0.2" />
     </svg>
   );
 }
@@ -102,7 +136,7 @@ function CameraWithOverlay({ onCapture, onClose }: { onCapture: (file: File) => 
 
   if (error) {
     return (
-      <div className="fixed inset-0 z-50 bg-black flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-red-400 mb-4">{error}</p>
           <Button onClick={onClose}>Schließen</Button>
@@ -112,7 +146,7 @@ function CameraWithOverlay({ onCapture, onClose }: { onCapture: (file: File) => 
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
+    <div className="fixed inset-0 z-[100] bg-black">
       <video
         ref={videoRef}
         autoPlay
@@ -122,26 +156,26 @@ function CameraWithOverlay({ onCapture, onClose }: { onCapture: (file: File) => 
       <BodyOutline />
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Controls */}
-      <div className="absolute bottom-0 left-0 right-0 p-6 flex items-center justify-center gap-8">
+      {/* Top bar with close button */}
+      <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-gradient-to-b from-black/60 to-transparent">
         <button
           onClick={onClose}
-          className="w-12 h-12 rounded-full bg-zinc-800/80 flex items-center justify-center"
+          className="w-10 h-10 rounded-full bg-black/50 backdrop-blur flex items-center justify-center"
         >
-          <X size={24} />
+          <X size={22} className="text-white" />
         </button>
-        <button
-          onClick={capturePhoto}
-          className="w-20 h-20 rounded-full bg-white flex items-center justify-center"
-        >
-          <div className="w-16 h-16 rounded-full border-4 border-black" />
-        </button>
-        <div className="w-12" /> {/* Spacer for balance */}
+        <p className="text-white/70 text-sm">Positioniere dich im Umriss</p>
+        <div className="w-10" />
       </div>
 
-      {/* Hint */}
-      <div className="absolute top-8 left-0 right-0 text-center">
-        <p className="text-white/60 text-sm">Positioniere dich im Umriss</p>
+      {/* Bottom capture button */}
+      <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center">
+        <button
+          onClick={capturePhoto}
+          className="w-20 h-20 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-lg"
+        >
+          <div className="w-16 h-16 rounded-full border-4 border-zinc-900" />
+        </button>
       </div>
     </div>
   );
