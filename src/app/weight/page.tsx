@@ -171,10 +171,12 @@ export default function WeightPage() {
   const estimatedTdee = tdeeTracking.calculatedTdee || 2200;
   const avgDailyCalories = (DAY_A.totals.calories + DAY_B.totals.calories) / 2;
 
+  const movingAvg = getMovingAverage(weights);
   const expectedWeights = getExpectedWeights(weights, avgDailyCalories, estimatedTdee);
   const chartData = weights.map((w, i) => ({
     date: format(new Date(w.date), 'd.M.', { locale: de }),
     weight: w.weight,
+    avg: movingAvg[i]?.avg,
     expected: expectedWeights[i]?.expected,
   }));
 
@@ -301,7 +303,24 @@ export default function WeightPage() {
 
       {/* Chart */}
       <Card className="mb-4">
-        <h3 className="text-sm font-medium text-zinc-400 mb-4">Gewichtsverlauf</h3>
+        <div className="flex justify-between items-start mb-4">
+          <h3 className="text-sm font-medium text-zinc-400">Gewichtsverlauf</h3>
+          {/* Legend */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-zinc-500"></div>
+              <span className="text-zinc-500">Aktuell</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-0.5 bg-amber-500"></div>
+              <span className="text-zinc-500">Trend</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-0.5 bg-emerald-500" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #22c55e 0, #22c55e 4px, transparent 4px, transparent 8px)' }}></div>
+              <span className="text-zinc-500">Erwartet</span>
+            </div>
+          </div>
+        </div>
         {chartData.length > 0 ? (
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
@@ -325,7 +344,11 @@ export default function WeightPage() {
                     borderRadius: '8px',
                   }}
                   labelStyle={{ color: '#a1a1aa' }}
-                  formatter={(value) => value != null ? [`${value} kg`, ''] : []}
+                  formatter={(value, name) => {
+                    if (value == null) return [];
+                    const label = name === 'weight' ? 'Aktuell' : name === 'avg' ? 'Trend' : 'Erwartet';
+                    return [`${value} kg`, label];
+                  }}
                 />
                 {goalWeight && (
                   <ReferenceLine
@@ -335,22 +358,34 @@ export default function WeightPage() {
                     label={{ value: 'Ziel', fill: '#a1a1aa', fontSize: 10 }}
                   />
                 )}
-                <Line
-                  type="monotone"
-                  dataKey="weight"
-                  stroke="#52525b"
-                  strokeWidth={1}
-                  dot={{ fill: '#52525b', r: 3 }}
-                  name="Gewicht"
-                />
+                {/* Expected line - dashed green, always goes down */}
                 <Line
                   type="monotone"
                   dataKey="expected"
                   stroke="#22c55e"
-                  strokeWidth={2}
+                  strokeWidth={1.5}
                   strokeDasharray="4 4"
                   dot={false}
-                  name="Erwartet"
+                  name="expected"
+                />
+                {/* Trend line - solid amber, smoothed actual data */}
+                <Line
+                  type="monotone"
+                  dataKey="avg"
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  dot={false}
+                  name="avg"
+                />
+                {/* Actual weight dots */}
+                <Line
+                  type="monotone"
+                  dataKey="weight"
+                  stroke="transparent"
+                  strokeWidth={0}
+                  dot={{ fill: '#71717a', r: 4, strokeWidth: 0 }}
+                  activeDot={{ fill: '#a1a1aa', r: 5 }}
+                  name="weight"
                 />
               </LineChart>
             </ResponsiveContainer>
