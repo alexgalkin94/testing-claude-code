@@ -23,6 +23,28 @@ function getMovingAverage(weights: Array<{ date: string; weight: number }>, days
   });
 }
 
+// Calculate expected weight trajectory based on caloric deficit
+function getExpectedWeights(
+  weights: Array<{ date: string; weight: number }>,
+  dailyCalories: number = 1700,
+  estimatedTdee: number = 2200
+): { date: string; expected: number }[] {
+  if (weights.length === 0) return [];
+
+  const firstWeight = weights[0].weight;
+  const firstDate = new Date(weights[0].date);
+
+  // Expected daily loss based on deficit (7700 kcal = 1 kg fat)
+  const dailyDeficit = estimatedTdee - dailyCalories;
+  const dailyLossKg = dailyDeficit / 7700;
+
+  return weights.map((entry) => {
+    const daysFromStart = differenceInDays(new Date(entry.date), firstDate);
+    const expectedWeight = firstWeight - (daysFromStart * dailyLossKg);
+    return { date: entry.date, expected: Math.round(expectedWeight * 10) / 10 };
+  });
+}
+
 export default function WeightPage() {
   const { data, isLoading, addWeight } = useData();
   const [showForm, setShowForm] = useState(false);
@@ -145,11 +167,15 @@ export default function WeightPage() {
     };
   }, [data.profile, data.weights, data.checklist, data.extraCalories, data.dayTypes]);
 
-  const movingAvg = getMovingAverage(weights);
+  // Use calculated TDEE if available, otherwise estimate based on typical deficit
+  const estimatedTdee = tdeeTracking.calculatedTdee || 2200;
+  const avgDailyCalories = (DAY_A.totals.calories + DAY_B.totals.calories) / 2;
+
+  const expectedWeights = getExpectedWeights(weights, avgDailyCalories, estimatedTdee);
   const chartData = weights.map((w, i) => ({
     date: format(new Date(w.date), 'd.M.', { locale: de }),
     weight: w.weight,
-    avg: movingAvg[i]?.avg,
+    expected: expectedWeights[i]?.expected,
   }));
 
   const latestWeight = weights[weights.length - 1]?.weight;
@@ -319,11 +345,12 @@ export default function WeightPage() {
                 />
                 <Line
                   type="monotone"
-                  dataKey="avg"
+                  dataKey="expected"
                   stroke="#22c55e"
                   strokeWidth={2}
+                  strokeDasharray="4 4"
                   dot={false}
-                  name="7-Tage Ø"
+                  name="Erwartet"
                 />
               </LineChart>
             </ResponsiveContainer>
