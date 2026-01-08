@@ -203,19 +203,18 @@ export default function TodayPage() {
     const expectedLossPerDay = dailyDeficit / 7700;
     const expectedLossPerWeek = expectedLossPerDay * 7;
 
-    // Expected weight accounts for water weight in first week
-    const effectiveDays = Math.max(0, daysElapsed - 7);
-    const expectedLoss = effectiveDays * expectedLossPerDay;
+    // Expected weight - straight calculation from start
+    const expectedLoss = daysElapsed * expectedLossPerDay;
     const expectedWeight = data.profile.startWeight - expectedLoss;
 
-    // Difference based on rolling average
+    // Difference: positive = ahead (actual lighter than expected), negative = behind
     const difference = expectedWeight - rollingAvgWeight;
     const isAhead = difference > 0;
 
     // Actual rate - prefer trend-based if available
     const actualRatePerWeek = weeklyTrend !== null
       ? weeklyTrend
-      : (effectiveDays > 0 ? (actualLoss / effectiveDays) * 7 : 0);
+      : (daysElapsed > 0 ? (actualLoss / daysElapsed) * 7 : 0);
 
     // Projected completion
     const remainingToLose = rollingAvgWeight - data.profile.goalWeight;
@@ -368,9 +367,9 @@ export default function TodayPage() {
                       <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium block mb-2">vs. Plan</span>
                       <div>
                         <span className={`text-xl font-semibold tracking-tight ${progressTracking.isAhead ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {progressTracking.isAhead ? '+' : '−'}{progressTracking.difference.toFixed(1)}
+                          {progressTracking.difference.toFixed(1)}
                         </span>
-                        <span className={`text-sm ml-1 ${progressTracking.isAhead ? 'text-emerald-400/70' : 'text-red-400/70'}`}>kg</span>
+                        <span className={`text-sm ml-1 ${progressTracking.isAhead ? 'text-emerald-400/70' : 'text-red-400/70'}`}>kg {progressTracking.isAhead ? '↓' : '↑'}</span>
                       </div>
                     </div>
                   </div>
@@ -450,10 +449,10 @@ export default function TodayPage() {
                       <span className="text-sm text-zinc-400">vs. Plan</span>
                     </div>
                     <p className={`text-2xl font-semibold ${progressTracking.isAhead ? 'text-emerald-500' : 'text-red-500'}`}>
-                      {progressTracking.isAhead ? '+' : '-'}{progressTracking.difference.toFixed(1)} kg
+                      {progressTracking.difference.toFixed(1)} kg
                     </p>
                     <p className="text-xs text-zinc-500 mt-1">
-                      {progressTracking.isAhead ? 'voraus' : 'hinten'}
+                      {progressTracking.isAhead ? 'unter Soll' : 'über Soll'}
                     </p>
                   </Card>
                 </div>
