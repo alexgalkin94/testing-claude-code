@@ -102,7 +102,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
             // Only update if server has newer data
             const localLastSync = data.lastSync;
             if (!localLastSync || serverData.lastSync > localLastSync) {
-              const merged = { ...DEFAULT_DATA, ...serverData };
+              const merged = {
+                ...DEFAULT_DATA,
+                ...serverData,
+                profile: { ...DEFAULT_DATA.profile, ...serverData?.profile },
+              };
               setData(merged);
               localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
               console.log('Refreshed from server:', serverData.lastSync);
@@ -143,7 +147,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        setData({ ...DEFAULT_DATA, ...parsed });
+        setData({
+          ...DEFAULT_DATA,
+          ...parsed,
+          profile: { ...DEFAULT_DATA.profile, ...parsed?.profile },
+        });
       }
     } catch (e) {
       console.error('Failed to load from localStorage:', e);
@@ -155,7 +163,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const serverData = await response.json();
         if (serverData) {
-          const merged = { ...DEFAULT_DATA, ...serverData };
+          const merged = {
+            ...DEFAULT_DATA,
+            ...serverData,
+            profile: { ...DEFAULT_DATA.profile, ...serverData?.profile },
+          };
           setData(merged);
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
         }
