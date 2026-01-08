@@ -6,6 +6,7 @@ import { de } from 'date-fns/locale';
 import { Camera, Trash2, ArrowLeftRight, X, Cloud, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
+import { useData } from '@/lib/data-store';
 
 interface Photo {
   url: string;
@@ -316,6 +317,8 @@ function ZoomableImage({ src, alt }: { src: string; alt: string }) {
 }
 
 export default function PhotosPage() {
+  const { data } = useData();
+  const blurPhotos = data.profile.blurPhotos;
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -453,7 +456,7 @@ export default function PhotosPage() {
                 <img
                   src={comparePhotos[0].url}
                   alt="Vorher"
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full object-cover ${blurPhotos ? 'blur-xl' : ''}`}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-zinc-600">
@@ -466,7 +469,7 @@ export default function PhotosPage() {
                 <img
                   src={comparePhotos[1].url}
                   alt="Nachher"
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full object-cover ${blurPhotos ? 'blur-xl' : ''}`}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-zinc-600">
@@ -563,7 +566,7 @@ export default function PhotosPage() {
                     <img
                       src={photo.url}
                       alt={`Fortschritt - ${photo.date}`}
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full object-cover ${blurPhotos ? 'blur-xl' : ''}`}
                     />
                   </div>
                 ))}

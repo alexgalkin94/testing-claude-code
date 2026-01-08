@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, User, Target, Flame, Check, Cloud, LogOut, RefreshCw } from 'lucide-react';
+import { Save, User, Target, Flame, Check, Cloud, LogOut, RefreshCw, Camera } from 'lucide-react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
@@ -36,7 +36,7 @@ export default function SettingsPage() {
     router.refresh();
   };
 
-  const updateField = (field: keyof typeof data.profile, value: string | number) => {
+  const updateField = (field: keyof typeof data.profile, value: string | number | boolean) => {
     const current = formData ?? data.profile;
     setFormData({ ...current, [field]: value });
   };
@@ -221,6 +221,52 @@ export default function SettingsPage() {
               ~{((profile.tdee - profile.calorieTarget) * 7 / 7700).toFixed(2)}
             </p>
             <p className="text-xs text-zinc-500">kg Verlust/Woche</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Photos */}
+      <Card className="mb-4">
+        <div className="flex items-center gap-2 mb-4">
+          <Camera size={18} className="text-blue-500" />
+          <h2 className="font-medium">Fotos</h2>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-zinc-300">Fotos-Tab anzeigen</p>
+              <p className="text-xs text-zinc-500">Tab in der Navigation ein-/ausblenden</p>
+            </div>
+            <button
+              onClick={() => updateField('showPhotosTab', !profile.showPhotosTab)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${
+                profile.showPhotosTab ? 'bg-emerald-500' : 'bg-zinc-700'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                  profile.showPhotosTab ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-zinc-300">Fotos verschwommen</p>
+              <p className="text-xs text-zinc-500">Vorschaubilder werden geblurt</p>
+            </div>
+            <button
+              onClick={() => updateField('blurPhotos', !profile.blurPhotos)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${
+                profile.blurPhotos ? 'bg-emerald-500' : 'bg-zinc-700'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                  profile.blurPhotos ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
         </div>
       </Card>

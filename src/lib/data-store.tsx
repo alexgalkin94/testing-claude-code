@@ -14,7 +14,9 @@ export interface AppData {
     calorieTarget: number;
     proteinTarget: number;
     tdee: number;
-    calculatedTdee?: number; // Calculated from real data
+    calculatedTdee?: number;
+    showPhotosTab: boolean;
+    blurPhotos: boolean;
   };
   // Weights
   weights: Array<{
@@ -47,6 +49,8 @@ const DEFAULT_DATA: AppData = {
     calorieTarget: 1700,
     proteinTarget: 157,
     tdee: 2125,
+    showPhotosTab: true,
+    blurPhotos: false,
   },
   weights: [],
   checklist: {},

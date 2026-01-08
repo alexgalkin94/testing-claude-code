@@ -9,8 +9,9 @@ import {
   ShoppingCart,
   Settings,
 } from 'lucide-react';
+import { useData } from '@/lib/data-store';
 
-const navItems = [
+const allNavItems = [
   { href: '/', icon: LayoutDashboard, label: 'Heute' },
   { href: '/weight', icon: Scale, label: 'Gewicht' },
   { href: '/photos', icon: Camera, label: 'Fotos' },
@@ -20,6 +21,11 @@ const navItems = [
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { data } = useData();
+
+  const navItems = allNavItems.filter(item =>
+    item.href !== '/photos' || data.profile.showPhotosTab !== false
+  );
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/90 backdrop-blur-lg border-t border-zinc-800">
