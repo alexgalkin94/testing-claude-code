@@ -30,15 +30,10 @@ jobs:
             # Get the last commit message as PR title
             COMMIT_MSG=$(git log -1 --pretty=%s)
 
-            # Create the PR
+            # Create the PR with HEREDOC for body
             gh pr create \
               --title "$COMMIT_MSG" \
-              --body "Automatically created PR for branch \`$BRANCH_NAME\`
-
-This PR was created automatically when the branch was pushed.
-
----
-*Created by GitHub Actions*" \
+              --body "Automatically created PR for branch $BRANCH_NAME" \
               --base main \
               --head "$BRANCH_NAME"
           else
