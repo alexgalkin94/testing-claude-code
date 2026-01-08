@@ -1,5 +1,8 @@
 # CutBoard
 
+[![CI](https://github.com/alexgalkin94/cutboard/actions/workflows/ci.yml/badge.svg)](https://github.com/alexgalkin94/cutboard/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Eine mobile-first Web-App zum Tracken deiner Cutting-Phase. Verfolge dein Gewicht, mache Fortschrittsfotos und bleib auf Kurs mit deinem Kalorienziel.
 
 ## Features
