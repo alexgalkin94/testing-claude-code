@@ -31,8 +31,8 @@ Eine mobile-first Web-App zum Tracken deiner Cutting-Phase. Verfolge dein Gewich
 
 ```bash
 # Repository klonen
-git clone https://github.com/alexgalkin94/testing-claude-code.git
-cd testing-claude-code
+git clone https://github.com/alexgalkin94/cutboard.git
+cd cutboard
 
 # Dependencies installieren
 npm install
