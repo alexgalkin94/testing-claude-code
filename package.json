@@ -1,7 +1,22 @@
 {
   "name": "cutboard",
   "version": "0.1.0",
+  "description": "Mobile-first cutting phase tracker - track weight, meals, and progress photos",
+  "author": "Alex Galkin",
+  "license": "MIT",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexgalkin94/testing-claude-code"
+  },
+  "keywords": [
+    "fitness",
+    "weight-tracker",
+    "cutting",
+    "diet",
+    "nextjs",
+    "react"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
