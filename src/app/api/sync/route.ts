@@ -27,7 +27,13 @@ export async function GET() {
       return NextResponse.json(null);
     }
 
-    const response = await fetch(dataBlob.url);
+    const cacheBuster = `?t=${Date.now()}`;
+    const response = await fetch(dataBlob.url + cacheBuster, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      },
+    });
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
