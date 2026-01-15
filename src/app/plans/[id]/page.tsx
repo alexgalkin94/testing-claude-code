@@ -12,8 +12,6 @@ import {
   TouchSensor,
   DragStartEvent,
   DragEndEvent,
-  useDroppable,
-  useDraggable,
   closestCenter,
 } from '@dnd-kit/core';
 import {
@@ -23,7 +21,6 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useAutoAnimate } from '@formkit/auto-animate/react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
@@ -51,15 +48,25 @@ const MealIcon = ({ icon, size = 16 }: { icon: string; size?: number }) => {
   }
 };
 
-function DraggableItem({ id, mealId, children }: { id: string; mealId: string; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id,
-    data: { mealId, type: 'item' },
-  });
+function SortableItem({ id, mealId, children }: { id: string; mealId: string; children: React.ReactNode }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, data: { mealId, type: 'item' } });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   return (
     <div
       ref={setNodeRef}
+      style={style}
       {...attributes}
       {...listeners}
       className={`cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'opacity-50' : ''}`}
@@ -97,23 +104,6 @@ function SortableMeal({ id, children }: { id: string; children: React.ReactNode 
   );
 }
 
-function ItemDropZone({ mealId, children }: { mealId: string; children: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `drop-${mealId}`, data: { mealId, type: 'itemDropZone' } });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`transition-colors ${isOver ? 'ring-2 ring-amber-500/50 ring-inset rounded-lg' : ''}`}
-    >
-      {children}
-    </div>
-  );
-}
-
-function AnimatedList({ children, className }: { children: React.ReactNode; className?: string }) {
-  const [parent] = useAutoAnimate();
-  return <div ref={parent} className={className}>{children}</div>;
-}
 
 type ExportFormat = 'json' | 'table' | 'text';
 
@@ -269,10 +259,31 @@ export default function PlanEditorPage() {
         });
         setHasChanges(true);
       }
-    } else if (activeData?.type === 'item' && overData?.type === 'itemDropZone') {
+    } else if (activeData?.type === 'item' && overData?.type === 'item') {
+      const sourceMealId = activeData.mealId as string;
       const targetMealId = overData.mealId as string;
-      if (activeData.mealId !== targetMealId) {
-        moveItem(activeData.mealId as string, targetMealId, active.id as string);
+
+      if (sourceMealId === targetMealId) {
+        // Reorder within same meal
+        const meal = editingPlan.meals.find(m => m.id === sourceMealId);
+        if (meal) {
+          const oldIndex = meal.items.findIndex(i => i.id === active.id);
+          const newIndex = meal.items.findIndex(i => i.id === over.id);
+          if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+            setEditingPlan({
+              ...editingPlan,
+              meals: editingPlan.meals.map(m =>
+                m.id === sourceMealId
+                  ? { ...m, items: arrayMove(m.items, oldIndex, newIndex) }
+                  : m
+              ),
+            });
+            setHasChanges(true);
+          }
+        }
+      } else {
+        // Move to different meal
+        moveItem(sourceMealId, targetMealId, active.id as string);
       }
     }
 
@@ -600,7 +611,9 @@ export default function PlanEditorPage() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    deleteMeal(meal.id);
+                    if (confirm(`"${meal.name}" wirklich löschen?`)) {
+                      deleteMeal(meal.id);
+                    }
                   }}
                   className="p-2 text-zinc-600 hover:text-red-500"
                 >
@@ -639,14 +652,14 @@ export default function PlanEditorPage() {
                   </div>
 
                   {/* Items List */}
-                  <ItemDropZone mealId={meal.id}>
-                  <AnimatedList className="p-4 space-y-3">
+                  <SortableContext items={meal.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                  <div className="p-4 space-y-3">
                     {meal.items.map((item) => {
                       const itemTotals = getItemTotals(item);
                       const isItemExpanded = expandedItems.has(item.id);
 
                       return (
-                        <DraggableItem key={item.id} id={item.id} mealId={meal.id}>
+                        <SortableItem key={item.id} id={item.id} mealId={meal.id}>
                         <div
                           className="bg-zinc-800/50 rounded-lg overflow-hidden"
                         >
@@ -921,7 +934,7 @@ export default function PlanEditorPage() {
                             </div>
                           )}
                         </div>
-                        </DraggableItem>
+                        </SortableItem>
                       );
                     })}
 
@@ -931,8 +944,8 @@ export default function PlanEditorPage() {
                     >
                       <Plus size={14} /> Item hinzufügen
                     </button>
-                  </AnimatedList>
-                  </ItemDropZone>
+                  </div>
+                  </SortableContext>
                 </div>
               )}
             </Card>
