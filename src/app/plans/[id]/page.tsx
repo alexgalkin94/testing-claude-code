@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Plus, ChevronLeft, ChevronDown, ChevronUp, X, Check, Sunrise, Sun, Sunset, Cookie, Download, Trash2 } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronDown, ChevronUp, X, Sunrise, Sun, Sunset, Cookie, Download, Trash2 } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -198,20 +198,58 @@ export default function PlanEditorPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeMealId, setActiveMealId] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<'item' | 'meal' | null>(null);
-  const [hasChanges, setHasChanges] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const initializedRef = useRef(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Only initialize once per planId, not on every data change
+    if (initializedRef.current) return;
+
     if (isNew) {
       const newPlan = createEmptyPlan('Neuer Plan');
       setEditingPlan(newPlan);
-      setHasChanges(true);
+      initializedRef.current = true;
     } else if (data.mealPlans[planId]) {
       setEditingPlan(clonePlan(data.mealPlans[planId]));
       setExpandedMeals(new Set(data.mealPlans[planId].meals.map(m => m.id)));
-      setHasChanges(false);
+      initializedRef.current = true;
     }
   }, [planId, isNew, data.mealPlans]);
+
+  // Reset initialized flag when planId changes
+  useEffect(() => {
+    initializedRef.current = false;
+  }, [planId]);
+
+  // Auto-save with debounce
+  useEffect(() => {
+    if (!editingPlan || !initializedRef.current) return;
+
+    // Clear previous timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Debounce save by 500ms
+    saveTimeoutRef.current = setTimeout(() => {
+      setIsSaving(true);
+      if (isNew) {
+        createPlan(editingPlan);
+        router.replace(`/plans/${editingPlan.id}`);
+      } else {
+        updatePlan(editingPlan);
+      }
+      setTimeout(() => setIsSaving(false), 500);
+    }, 500);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [editingPlan, isNew, createPlan, updatePlan, router]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -257,7 +295,7 @@ export default function PlanEditorPage() {
           ...editingPlan,
           meals: arrayMove(editingPlan.meals, oldIndex, newIndex),
         });
-        setHasChanges(true);
+        
       }
     } else if (activeData?.type === 'item' && overData?.type === 'item') {
       const sourceMealId = activeData.mealId as string;
@@ -292,18 +330,6 @@ export default function PlanEditorPage() {
     setActiveType(null);
   };
 
-  const handleSavePlan = () => {
-    if (!editingPlan) return;
-
-    if (isNew) {
-      createPlan(editingPlan);
-      router.replace(`/plans/${editingPlan.id}`);
-    } else {
-      updatePlan(editingPlan);
-    }
-    setHasChanges(false);
-  };
-
   const handleBack = () => {
     router.push('/plans');
   };
@@ -318,7 +344,7 @@ export default function PlanEditorPage() {
   const updatePlanName = (name: string) => {
     if (!editingPlan) return;
     setEditingPlan({ ...editingPlan, name });
-    setHasChanges(true);
+    
   };
 
   const addMeal = () => {
@@ -329,7 +355,7 @@ export default function PlanEditorPage() {
       meals: [...editingPlan.meals, newMeal],
     });
     setExpandedMeals(prev => new Set([...prev, newMeal.id]));
-    setHasChanges(true);
+    
   };
 
   const updateMeal = (mealId: string, updates: Partial<Meal>) => {
@@ -340,7 +366,7 @@ export default function PlanEditorPage() {
         m.id === mealId ? { ...m, ...updates } : m
       ),
     });
-    setHasChanges(true);
+    
   };
 
   const deleteMeal = (mealId: string) => {
@@ -349,7 +375,7 @@ export default function PlanEditorPage() {
       ...editingPlan,
       meals: editingPlan.meals.filter(m => m.id !== mealId),
     });
-    setHasChanges(true);
+    
   };
 
   const addItem = (mealId: string) => {
@@ -364,7 +390,7 @@ export default function PlanEditorPage() {
       ),
     });
     setExpandedItems(prev => new Set([...prev, newItem.id]));
-    setHasChanges(true);
+    
   };
 
   const updateItem = (mealId: string, itemId: string, updates: Partial<MealItem>) => {
@@ -382,7 +408,7 @@ export default function PlanEditorPage() {
           : m
       ),
     });
-    setHasChanges(true);
+    
   };
 
   const deleteItem = (mealId: string, itemId: string) => {
@@ -395,7 +421,7 @@ export default function PlanEditorPage() {
           : m
       ),
     });
-    setHasChanges(true);
+    
   };
 
   const moveItem = (fromMealId: string, toMealId: string, itemId: string) => {
@@ -416,7 +442,7 @@ export default function PlanEditorPage() {
         return m;
       }),
     });
-    setHasChanges(true);
+    
   };
 
   const addAlternative = (mealId: string, itemId: string) => {
@@ -437,7 +463,7 @@ export default function PlanEditorPage() {
           : m
       ),
     });
-    setHasChanges(true);
+    
   };
 
   const updateAlternative = (mealId: string, itemId: string, altId: string, updates: Partial<MealItem>) => {
@@ -462,7 +488,7 @@ export default function PlanEditorPage() {
           : m
       ),
     });
-    setHasChanges(true);
+    
   };
 
   const deleteAlternative = (mealId: string, itemId: string, altId: string) => {
@@ -482,7 +508,7 @@ export default function PlanEditorPage() {
           : m
       ),
     });
-    setHasChanges(true);
+    
   };
 
   const toggleMealExpanded = (mealId: string) => {
@@ -545,9 +571,9 @@ export default function PlanEditorPage() {
               </div>
             )}
           </div>
-          <Button onClick={handleSavePlan} size="sm" disabled={!hasChanges}>
-            <Check size={16} className="mr-1" /> Speichern
-          </Button>
+          <span className={`text-xs px-2 py-1 rounded ${isSaving ? 'text-amber-500' : 'text-zinc-500'}`}>
+            {isSaving ? 'Speichert...' : 'Gespeichert'}
+          </span>
         </div>
       </div>
 

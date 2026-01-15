@@ -27,7 +27,10 @@ export async function GET() {
       return NextResponse.json(null);
     }
 
-    const response = await fetch(dataBlob.url);
+    const response = await fetch(dataBlob.url, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' },
+    });
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
