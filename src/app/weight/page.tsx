@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { format, differenceInDays, addDays, subDays } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine } from 'recharts';
-import { Plus, TrendingDown, Zap } from 'lucide-react';
+import { Plus, TrendingDown, Zap, Info, X } from 'lucide-react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
@@ -50,6 +50,7 @@ export default function WeightPage() {
   const [showForm, setShowForm] = useState(false);
   const [newWeight, setNewWeight] = useState('');
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [showChartInfo, setShowChartInfo] = useState(false);
 
   // TDEE Calculation - must be before any early returns
   const tdeeTracking = useMemo(() => {
@@ -323,7 +324,16 @@ export default function WeightPage() {
       {/* Chart */}
       <Card className="mb-4">
         <div className="flex justify-between items-start mb-4">
-          <h3 className="text-sm font-medium text-zinc-400">Gewichtsverlauf</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium text-zinc-400">Gewichtsverlauf</h3>
+            <button
+              onClick={() => setShowChartInfo(true)}
+              className="text-zinc-500 hover:text-zinc-300 transition-colors"
+              aria-label="Info zu den Linien"
+            >
+              <Info size={14} />
+            </button>
+          </div>
           {/* Legend */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
             <div className="flex items-center gap-1.5">
@@ -437,6 +447,85 @@ export default function WeightPage() {
           )}
         </div>
       </Card>
+
+      {/* Chart Info Modal */}
+      {showChartInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/70" onClick={() => setShowChartInfo(false)} />
+          <div className="relative bg-zinc-900 rounded-2xl border border-zinc-800 p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <button
+              onClick={() => setShowChartInfo(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+
+            <h2 className="text-lg font-semibold mb-4">Chart-Linien erklärt</h2>
+
+            <div className="space-y-5">
+              {/* Aktuell */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-3 h-3 rounded-full bg-white"></div>
+                  <span className="font-medium">Aktuell (Weiße Punkte)</span>
+                </div>
+                <p className="text-sm text-zinc-400">
+                  Dein tatsächlich gemessenes Gewicht an jedem Tag.
+                </p>
+              </div>
+
+              {/* Trend */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-0.5 bg-amber-500"></div>
+                  <span className="font-medium text-amber-500">Trend (Gelbe Linie)</span>
+                </div>
+                <p className="text-sm text-zinc-400 mb-2">
+                  7-Tage gleitender Durchschnitt deines Gewichts. Glättet tägliche Schwankungen (Wasser, Verdauung) und zeigt die echte Richtung.
+                </p>
+                <div className="bg-zinc-800 rounded-lg p-3 text-xs font-mono">
+                  Trend = Ø der letzten 7 Messungen
+                </div>
+              </div>
+
+              {/* Erwartet */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-0.5 bg-emerald-500" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #22c55e 0, #22c55e 4px, transparent 4px, transparent 8px)' }}></div>
+                  <span className="font-medium text-emerald-500">Erwartet (Grün gestrichelt)</span>
+                </div>
+                <p className="text-sm text-zinc-400 mb-2">
+                  Theoretischer Gewichtsverlust basierend auf deinem Kaloriendefizit.
+                </p>
+                <div className="bg-zinc-800 rounded-lg p-3 text-xs font-mono space-y-1">
+                  <div>Defizit = TDEE − Kalorienaufnahme</div>
+                  <div>Verlust/Tag = Defizit ÷ 7700 kcal</div>
+                  <div className="text-zinc-500">(7700 kcal = 1 kg Körperfett)</div>
+                </div>
+              </div>
+
+              {/* TDEE */}
+              <div className="border-t border-zinc-800 pt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap size={16} className="text-blue-400" />
+                  <span className="font-medium text-blue-400">TDEE Berechnung</span>
+                </div>
+                <p className="text-sm text-zinc-400 mb-2">
+                  Nach 21+ Tagen Tracking wird dein echter TDEE automatisch berechnet:
+                </p>
+                <div className="bg-zinc-800 rounded-lg p-3 text-xs font-mono">
+                  <div>TDEE = Ø Kalorien + (Gewichtsverlust × 1100)</div>
+                  <div className="text-zinc-500 mt-1">Wobei: 1100 = 7700 ÷ 7 Tage</div>
+                </div>
+                <p className="text-xs text-zinc-500 mt-2">
+                  Aktueller TDEE: {tdeeTracking.calculatedTdee || data.profile.tdee} kcal
+                  {tdeeTracking.calculatedTdee ? ' (berechnet)' : ' (manuell in Settings)'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
