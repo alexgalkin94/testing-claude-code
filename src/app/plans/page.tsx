@@ -71,7 +71,7 @@ function DraggableItem({ id, mealId, children }: { id: string; mealId: string; c
   );
 }
 
-// Sortable meal wrapper (for reordering meals + accepting item drops)
+// Sortable meal wrapper (for reordering meals)
 function SortableMeal({ id, children }: { id: string; children: React.ReactNode }) {
   const {
     attributes,
@@ -82,8 +82,6 @@ function SortableMeal({ id, children }: { id: string; children: React.ReactNode 
     isDragging,
   } = useSortable({ id, data: { type: 'meal' } });
 
-  const { isOver } = useDroppable({ id });
-
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -93,11 +91,25 @@ function SortableMeal({ id, children }: { id: string; children: React.ReactNode 
     <div
       ref={setNodeRef}
       style={style}
-      className={`transition-colors rounded-lg ${isDragging ? 'opacity-50 z-50' : ''} ${isOver ? 'ring-2 ring-amber-500/50' : ''}`}
+      {...attributes}
+      {...listeners}
+      className={`cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-50 z-50' : ''}`}
     >
-      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
-        {children}
-      </div>
+      {children}
+    </div>
+  );
+}
+
+// Droppable zone for items (inside meals)
+function ItemDropZone({ mealId, children }: { mealId: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `drop-${mealId}`, data: { mealId, type: 'itemDropZone' } });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`transition-colors ${isOver ? 'ring-2 ring-amber-500/50 ring-inset rounded-lg' : ''}`}
+    >
+      {children}
     </div>
   );
 }
@@ -200,6 +212,7 @@ export default function PlansPage() {
     }
 
     const activeData = active.data.current;
+    const overData = over.data.current;
 
     // Meal reordering
     if (activeData?.type === 'meal') {
@@ -213,9 +226,12 @@ export default function PlansPage() {
         setHasChanges(true);
       }
     }
-    // Item moving between meals
-    else if (activeData?.type === 'item' && activeData?.mealId !== over.id) {
-      moveItem(activeData.mealId as string, over.id as string, active.id as string);
+    // Item moving between meals (dropped on ItemDropZone)
+    else if (activeData?.type === 'item' && overData?.type === 'itemDropZone') {
+      const targetMealId = overData.mealId as string;
+      if (activeData.mealId !== targetMealId) {
+        moveItem(activeData.mealId as string, targetMealId, active.id as string);
+      }
     }
 
     setActiveId(null);
@@ -605,6 +621,7 @@ export default function PlansPage() {
                     </div>
 
                     {/* Items List */}
+                    <ItemDropZone mealId={meal.id}>
                     <AnimatedList className="p-4 space-y-3">
                       {meal.items.map((item) => {
                         const itemTotals = getItemTotals(item);
@@ -903,6 +920,7 @@ export default function PlansPage() {
                         <Plus size={14} /> Item hinzufügen
                       </button>
                     </AnimatedList>
+                    </ItemDropZone>
                   </div>
                 )}
               </Card>
