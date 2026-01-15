@@ -404,88 +404,159 @@ export default function PlansPage() {
                             {/* Item Edit Form */}
                             {isItemExpanded && (
                               <div className="p-3 pt-0 space-y-3 border-t border-zinc-700/50">
-                                <div className="grid grid-cols-2 gap-3">
-                                  <Input
-                                    label="Name"
-                                    value={item.name}
-                                    onChange={(v) => updateItem(meal.id, item.id, { name: v })}
-                                    placeholder="z.B. Eier"
-                                  />
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <Input
-                                      label="Menge"
-                                      type="number"
-                                      value={item.quantity.toString()}
-                                      onChange={(v) => updateItem(meal.id, item.id, { quantity: parseFloat(v) || 0 })}
-                                    />
-                                    <div>
-                                      <label className="block text-xs text-zinc-500 mb-1">Einheit</label>
-                                      <select
-                                        value={item.unit}
-                                        onChange={(e) => updateItem(meal.id, item.id, { unit: e.target.value })}
-                                        className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm"
-                                      >
-                                        <option value="g">g</option>
-                                        <option value="ml">ml</option>
-                                        <option value="Stück">Stück</option>
-                                        <option value="Portion">Portion</option>
-                                        <option value="Scheiben">Scheiben</option>
-                                        <option value="EL">EL</option>
-                                        <option value="TL">TL</option>
-                                      </select>
+                                {/* If no alternatives, show simple form */}
+                                {(!item.alternatives || item.alternatives.length === 0) ? (
+                                  <>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <Input
+                                        label="Name"
+                                        value={item.name}
+                                        onChange={(v) => updateItem(meal.id, item.id, { name: v })}
+                                        placeholder="z.B. Eier"
+                                      />
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <Input
+                                          label="Menge"
+                                          type="number"
+                                          value={item.quantity.toString()}
+                                          onChange={(v) => updateItem(meal.id, item.id, { quantity: parseFloat(v) || 0 })}
+                                        />
+                                        <div>
+                                          <label className="block text-xs text-zinc-500 mb-1">Einheit</label>
+                                          <select
+                                            value={item.unit}
+                                            onChange={(e) => updateItem(meal.id, item.id, { unit: e.target.value })}
+                                            className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm"
+                                          >
+                                            <option value="g">g</option>
+                                            <option value="ml">ml</option>
+                                            <option value="Stück">Stück</option>
+                                            <option value="Portion">Portion</option>
+                                            <option value="Scheiben">Scheiben</option>
+                                            <option value="EL">EL</option>
+                                            <option value="TL">TL</option>
+                                          </select>
+                                        </div>
+                                      </div>
                                     </div>
-                                  </div>
-                                </div>
+                                    <p className="text-xs text-zinc-500 font-medium mt-2">
+                                      Nährwerte pro {item.unit === 'g' ? '100g' : item.unit === 'ml' ? '100ml' : 'Einheit'}:
+                                    </p>
+                                    <div className="grid grid-cols-4 gap-2">
+                                      <Input
+                                        label="kcal"
+                                        type="number"
+                                        value={item.caloriesPer.toString()}
+                                        onChange={(v) => updateItem(meal.id, item.id, { caloriesPer: parseFloat(v) || 0 })}
+                                      />
+                                      <Input
+                                        label="Protein"
+                                        type="number"
+                                        value={item.proteinPer.toString()}
+                                        onChange={(v) => updateItem(meal.id, item.id, { proteinPer: parseFloat(v) || 0 })}
+                                      />
+                                      <Input
+                                        label="Carbs"
+                                        type="number"
+                                        value={item.carbsPer.toString()}
+                                        onChange={(v) => updateItem(meal.id, item.id, { carbsPer: parseFloat(v) || 0 })}
+                                      />
+                                      <Input
+                                        label="Fett"
+                                        type="number"
+                                        value={item.fatPer.toString()}
+                                        onChange={(v) => updateItem(meal.id, item.id, { fatPer: parseFloat(v) || 0 })}
+                                      />
+                                    </div>
+                                    <div className="bg-zinc-900 rounded p-2 text-xs text-zinc-400">
+                                      Gesamt: {itemTotals.calories} kcal · {itemTotals.protein}g P · {itemTotals.carbs}g C · {itemTotals.fat}g F
+                                    </div>
+                                  </>
+                                ) : (
+                                  /* With alternatives: show all options equally */
+                                  <div className="space-y-3">
+                                    {/* Option 1 (main item) */}
+                                    <div className="bg-zinc-900/50 rounded-lg p-3 space-y-3 border-l-2 border-emerald-500/30">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-emerald-500/70 font-medium">Option 1</span>
+                                        <input
+                                          type="text"
+                                          value={item.name}
+                                          onChange={(e) => updateItem(meal.id, item.id, { name: e.target.value })}
+                                          className="flex-1 text-sm font-medium bg-transparent border-none outline-none"
+                                          placeholder="Name"
+                                        />
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <Input
+                                          label="Menge"
+                                          type="number"
+                                          value={item.quantity.toString()}
+                                          onChange={(v) => updateItem(meal.id, item.id, { quantity: parseFloat(v) || 0 })}
+                                        />
+                                        <div>
+                                          <label className="block text-xs text-zinc-500 mb-1">Einheit</label>
+                                          <select
+                                            value={item.unit}
+                                            onChange={(e) => updateItem(meal.id, item.id, { unit: e.target.value })}
+                                            className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm"
+                                          >
+                                            <option value="g">g</option>
+                                            <option value="ml">ml</option>
+                                            <option value="Stück">Stück</option>
+                                            <option value="Portion">Portion</option>
+                                            <option value="Scheiben">Scheiben</option>
+                                            <option value="EL">EL</option>
+                                            <option value="TL">TL</option>
+                                          </select>
+                                        </div>
+                                      </div>
+                                      <p className="text-xs text-zinc-500 font-medium">
+                                        Nährwerte pro {item.unit === 'g' ? '100g' : item.unit === 'ml' ? '100ml' : 'Einheit'}:
+                                      </p>
+                                      <div className="grid grid-cols-4 gap-2">
+                                        <Input
+                                          label="kcal"
+                                          type="number"
+                                          value={item.caloriesPer.toString()}
+                                          onChange={(v) => updateItem(meal.id, item.id, { caloriesPer: parseFloat(v) || 0 })}
+                                        />
+                                        <Input
+                                          label="Protein"
+                                          type="number"
+                                          value={item.proteinPer.toString()}
+                                          onChange={(v) => updateItem(meal.id, item.id, { proteinPer: parseFloat(v) || 0 })}
+                                        />
+                                        <Input
+                                          label="Carbs"
+                                          type="number"
+                                          value={item.carbsPer.toString()}
+                                          onChange={(v) => updateItem(meal.id, item.id, { carbsPer: parseFloat(v) || 0 })}
+                                        />
+                                        <Input
+                                          label="Fett"
+                                          type="number"
+                                          value={item.fatPer.toString()}
+                                          onChange={(v) => updateItem(meal.id, item.id, { fatPer: parseFloat(v) || 0 })}
+                                        />
+                                      </div>
+                                      <div className="bg-zinc-900 rounded p-2 text-xs text-zinc-400">
+                                        Gesamt: {itemTotals.calories} kcal · {itemTotals.protein}g P · {itemTotals.carbs}g C · {itemTotals.fat}g F
+                                      </div>
+                                    </div>
 
-                                <p className="text-xs text-zinc-500 font-medium mt-2">
-                                  Nährwerte pro {item.unit === 'g' ? '100g' : item.unit === 'ml' ? '100ml' : 'Einheit'}:
-                                </p>
-                                <div className="grid grid-cols-4 gap-2">
-                                  <Input
-                                    label="kcal"
-                                    type="number"
-                                    value={item.caloriesPer.toString()}
-                                    onChange={(v) => updateItem(meal.id, item.id, { caloriesPer: parseFloat(v) || 0 })}
-                                  />
-                                  <Input
-                                    label="Protein"
-                                    type="number"
-                                    value={item.proteinPer.toString()}
-                                    onChange={(v) => updateItem(meal.id, item.id, { proteinPer: parseFloat(v) || 0 })}
-                                  />
-                                  <Input
-                                    label="Carbs"
-                                    type="number"
-                                    value={item.carbsPer.toString()}
-                                    onChange={(v) => updateItem(meal.id, item.id, { carbsPer: parseFloat(v) || 0 })}
-                                  />
-                                  <Input
-                                    label="Fett"
-                                    type="number"
-                                    value={item.fatPer.toString()}
-                                    onChange={(v) => updateItem(meal.id, item.id, { fatPer: parseFloat(v) || 0 })}
-                                  />
-                                </div>
-
-                                <div className="bg-zinc-900 rounded p-2 text-xs text-zinc-400">
-                                  Gesamt: {itemTotals.calories} kcal · {itemTotals.protein}g P · {itemTotals.carbs}g C · {itemTotals.fat}g F
-                                </div>
-
-                                {/* Alternatives */}
-                                {item.alternatives && item.alternatives.length > 0 && (
-                                  <div className="mt-3 space-y-2">
-                                    <p className="text-xs text-zinc-500 font-medium">Alternativen:</p>
-                                    {item.alternatives.map((alt) => {
+                                    {/* Other options */}
+                                    {item.alternatives.map((alt, index) => {
                                       const altTotals = getItemTotals(alt);
                                       return (
-                                        <div key={alt.id} className="bg-zinc-900/50 rounded-lg p-3 space-y-2">
+                                        <div key={alt.id} className="bg-zinc-900/50 rounded-lg p-3 space-y-3 border-l-2 border-amber-500/30">
                                           <div className="flex items-center gap-2">
-                                            <span className="text-xs text-amber-500/70">ODER</span>
+                                            <span className="text-xs text-amber-500/70 font-medium">Option {index + 2}</span>
                                             <input
                                               type="text"
                                               value={alt.name}
                                               onChange={(e) => updateAlternative(meal.id, item.id, alt.id, { name: e.target.value })}
-                                              className="flex-1 text-sm bg-transparent border-none outline-none"
+                                              className="flex-1 text-sm font-medium bg-transparent border-none outline-none"
                                               placeholder="Name"
                                             />
                                             <button
@@ -495,7 +566,7 @@ export default function PlansPage() {
                                               <X size={12} />
                                             </button>
                                           </div>
-                                          <div className="grid grid-cols-6 gap-2">
+                                          <div className="grid grid-cols-2 gap-2">
                                             <Input
                                               label="Menge"
                                               type="number"
@@ -507,7 +578,7 @@ export default function PlansPage() {
                                               <select
                                                 value={alt.unit}
                                                 onChange={(e) => updateAlternative(meal.id, item.id, alt.id, { unit: e.target.value })}
-                                                className="w-full bg-zinc-800 border border-zinc-700 rounded px-1 py-1.5 text-xs"
+                                                className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm"
                                               >
                                                 <option value="g">g</option>
                                                 <option value="ml">ml</option>
@@ -518,6 +589,11 @@ export default function PlansPage() {
                                                 <option value="TL">TL</option>
                                               </select>
                                             </div>
+                                          </div>
+                                          <p className="text-xs text-zinc-500 font-medium">
+                                            Nährwerte pro {alt.unit === 'g' ? '100g' : alt.unit === 'ml' ? '100ml' : 'Einheit'}:
+                                          </p>
+                                          <div className="grid grid-cols-4 gap-2">
                                             <Input
                                               label="kcal"
                                               type="number"
@@ -525,27 +601,27 @@ export default function PlansPage() {
                                               onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { caloriesPer: parseFloat(v) || 0 })}
                                             />
                                             <Input
-                                              label="P"
+                                              label="Protein"
                                               type="number"
                                               value={alt.proteinPer.toString()}
                                               onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { proteinPer: parseFloat(v) || 0 })}
                                             />
                                             <Input
-                                              label="C"
+                                              label="Carbs"
                                               type="number"
                                               value={alt.carbsPer.toString()}
                                               onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { carbsPer: parseFloat(v) || 0 })}
                                             />
                                             <Input
-                                              label="F"
+                                              label="Fett"
                                               type="number"
                                               value={alt.fatPer.toString()}
                                               onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { fatPer: parseFloat(v) || 0 })}
                                             />
                                           </div>
-                                          <p className="text-[10px] text-zinc-500">
-                                            = {altTotals.calories} kcal · {altTotals.protein}g P · {altTotals.carbs}g C · {altTotals.fat}g F
-                                          </p>
+                                          <div className="bg-zinc-900 rounded p-2 text-xs text-zinc-400">
+                                            Gesamt: {altTotals.calories} kcal · {altTotals.protein}g P · {altTotals.carbs}g C · {altTotals.fat}g F
+                                          </div>
                                         </div>
                                       );
                                     })}
@@ -555,7 +631,7 @@ export default function PlansPage() {
                                   onClick={() => addAlternative(meal.id, item.id)}
                                   className="w-full mt-2 py-1.5 px-3 rounded border border-dashed border-zinc-700 text-zinc-500 hover:border-amber-500/50 hover:text-amber-500/70 text-xs flex items-center justify-center gap-1"
                                 >
-                                  <Plus size={12} /> Alternative hinzufügen
+                                  <Plus size={12} /> {item.alternatives?.length ? 'Weitere Option' : 'Alternative hinzufügen'}
                                 </button>
                               </div>
                             )}
