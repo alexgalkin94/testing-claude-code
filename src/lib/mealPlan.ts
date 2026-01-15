@@ -63,7 +63,7 @@ export function getItemTotals(item: MealItem, overrideQuantity?: number) {
 
 // Helper to calculate meal totals
 export function getMealTotals(meal: Meal, overrides: ItemOverride[] = []) {
-  return meal.items.reduce((acc, item) => {
+  const result = meal.items.reduce((acc, item) => {
     const override = overrides.find(o => o.itemId === item.id);
     const totals = getItemTotals(item, override?.quantity);
     return {
@@ -73,11 +73,17 @@ export function getMealTotals(meal: Meal, overrides: ItemOverride[] = []) {
       fat: acc.fat + totals.fat,
     };
   }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  return {
+    calories: Math.round(result.calories),
+    protein: Math.round(result.protein * 10) / 10,
+    carbs: Math.round(result.carbs * 10) / 10,
+    fat: Math.round(result.fat * 10) / 10,
+  };
 }
 
 // Helper to calculate plan totals
 export function getPlanTotals(plan: MealPlan, overrides: ItemOverride[] = []) {
-  return plan.meals.reduce((acc, meal) => {
+  const result = plan.meals.reduce((acc, meal) => {
     const mealTotals = getMealTotals(meal, overrides);
     return {
       calories: acc.calories + mealTotals.calories,
@@ -86,6 +92,12 @@ export function getPlanTotals(plan: MealPlan, overrides: ItemOverride[] = []) {
       fat: acc.fat + mealTotals.fat,
     };
   }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  return {
+    calories: Math.round(result.calories),
+    protein: Math.round(result.protein * 10) / 10,
+    carbs: Math.round(result.carbs * 10) / 10,
+    fat: Math.round(result.fat * 10) / 10,
+  };
 }
 
 // Default Plan A: Iglo & Potato Tag (~1718 kcal)

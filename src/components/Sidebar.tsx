@@ -9,11 +9,13 @@ import {
   ShoppingCart,
   Settings,
   LogOut,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { signOut, useSession } from '@/lib/auth-client';
 
 const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Heute' },
+  { href: '/plans', icon: UtensilsCrossed, label: 'Pläne' },
   { href: '/weight', icon: Scale, label: 'Gewicht' },
   { href: '/photos', icon: Camera, label: 'Fotos' },
   { href: '/shopping', icon: ShoppingCart, label: 'Einkauf' },

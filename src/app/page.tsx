@@ -194,7 +194,12 @@ export default function TodayPage() {
         }
       });
     });
-    return result;
+    return {
+      calories: Math.round(result.calories),
+      protein: Math.round(result.protein * 10) / 10,
+      carbs: Math.round(result.carbs * 10) / 10,
+      fat: Math.round(result.fat * 10) / 10,
+    };
   }, [plan, checkedItems, dayOverrides]);
 
   // Calculate plan totals (all items, for display)
