@@ -13,6 +13,8 @@ export interface MealItem {
   unit: string; // 'Stück', 'g', 'ml', 'Scheiben', etc.
   // Alternative items (e.g., 200g rice OR 400g potatoes)
   alternatives?: MealItem[];
+  // Group name when item has alternatives (e.g., "Beilage" for Kartoffeln/Reis options)
+  groupName?: string;
 }
 
 export interface Meal {
