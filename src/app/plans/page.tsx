@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Trash2, ChevronLeft, ChevronDown, ChevronUp, GripVertical, X, Check, Sunrise, Sun, Sunset, Cookie } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronDown, ChevronUp, GripVertical, X, Check, Sunrise, Sun, Sunset, Cookie, ArrowRightLeft } from 'lucide-react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
@@ -38,6 +38,7 @@ export default function PlansPage() {
   const [editingPlan, setEditingPlan] = useState<MealPlan | null>(null);
   const [expandedMeals, setExpandedMeals] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [movingItemId, setMovingItemId] = useState<string | null>(null);
 
   const plans = Object.values(data.mealPlans);
 
@@ -156,6 +157,26 @@ export default function PlansPage() {
           ? { ...m, items: m.items.filter(i => i.id !== itemId) }
           : m
       ),
+    });
+  };
+
+  const moveItem = (fromMealId: string, toMealId: string, itemId: string) => {
+    if (!editingPlan || fromMealId === toMealId) return;
+    const fromMeal = editingPlan.meals.find(m => m.id === fromMealId);
+    const itemToMove = fromMeal?.items.find(i => i.id === itemId);
+    if (!itemToMove) return;
+
+    setEditingPlan({
+      ...editingPlan,
+      meals: editingPlan.meals.map(m => {
+        if (m.id === fromMealId) {
+          return { ...m, items: m.items.filter(i => i.id !== itemId) };
+        }
+        if (m.id === toMealId) {
+          return { ...m, items: [...m.items, itemToMove] };
+        }
+        return m;
+      }),
     });
   };
 
@@ -394,6 +415,38 @@ export default function PlansPage() {
                                 <p className="text-xs text-zinc-500">
                                   {itemTotals.calories} kcal · {itemTotals.protein}g P · {itemTotals.carbs}g C · {itemTotals.fat}g F
                                 </p>
+                              </div>
+                              {/* Move button with dropdown */}
+                              <div className="relative">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setMovingItemId(movingItemId === item.id ? null : item.id);
+                                  }}
+                                  className="p-1.5 text-zinc-600 hover:text-zinc-400"
+                                  title="Verschieben"
+                                >
+                                  <ArrowRightLeft size={14} />
+                                </button>
+                                {movingItemId === item.id && (
+                                  <div className="absolute right-0 top-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-10 py-1 min-w-[140px]">
+                                    <p className="px-3 py-1 text-xs text-zinc-500">Verschieben nach:</p>
+                                    {editingPlan?.meals.filter(m => m.id !== meal.id).map(targetMeal => (
+                                      <button
+                                        key={targetMeal.id}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          moveItem(meal.id, targetMeal.id, item.id);
+                                          setMovingItemId(null);
+                                        }}
+                                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700 flex items-center gap-2"
+                                      >
+                                        <MealIcon icon={targetMeal.icon} size={12} />
+                                        {targetMeal.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                               <button
                                 onClick={(e) => {
