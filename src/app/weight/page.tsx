@@ -327,7 +327,7 @@ export default function WeightPage() {
           {/* Legend */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-zinc-500"></div>
+              <div className="w-2 h-2 rounded-full bg-white"></div>
               <span className="text-zinc-500">Aktuell</span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -396,14 +396,15 @@ export default function WeightPage() {
                   dot={false}
                   name="avg"
                 />
-                {/* Actual weight dots */}
+                {/* Actual weight dots - rendered last to be on top */}
                 <Line
                   type="monotone"
                   dataKey="weight"
-                  stroke="transparent"
-                  strokeWidth={0}
-                  dot={{ fill: '#71717a', r: 4, strokeWidth: 0 }}
-                  activeDot={{ fill: '#a1a1aa', r: 5 }}
+                  stroke="#ffffff"
+                  strokeWidth={1}
+                  strokeOpacity={0.3}
+                  dot={{ fill: '#ffffff', r: 4, strokeWidth: 0 }}
+                  activeDot={{ fill: '#ffffff', r: 6, stroke: '#ffffff', strokeWidth: 2 }}
                   name="weight"
                 />
               </LineChart>
