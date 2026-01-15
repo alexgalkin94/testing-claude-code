@@ -1,6 +1,15 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import {
+  MealPlan,
+  DaySnapshot,
+  ItemOverride,
+  DEFAULT_MEAL_PLANS,
+  DEFAULT_PLAN_A,
+  DEFAULT_PLAN_B,
+  getPlanTotals,
+} from './mealPlan';
 
 // All app data in one place
 export interface AppData {
@@ -31,13 +40,29 @@ export interface AppData {
   extraCalories: {
     [date: string]: number;
   };
-  // Day type per date (A or B)
+  // Day type per date (A or B) - LEGACY, kept for migration
   dayTypes: {
     [date: string]: 'A' | 'B';
   };
+  // NEW: User-editable meal plans
+  mealPlans: {
+    [planId: string]: MealPlan;
+  };
+  // NEW: Which plan is selected for each day
+  dayPlanIds: {
+    [date: string]: string; // planId
+  };
+  // NEW: Snapshots of plans for historical days (preserves data integrity)
+  daySnapshots: {
+    [date: string]: DaySnapshot;
+  };
+  // NEW: Track if migration has been done
+  migrationVersion?: number;
   // Metadata
   lastSync?: string;
 }
+
+const CURRENT_MIGRATION_VERSION = 1;
 
 const DEFAULT_DATA: AppData = {
   profile: {
@@ -56,6 +81,10 @@ const DEFAULT_DATA: AppData = {
   checklist: {},
   extraCalories: {},
   dayTypes: {},
+  mealPlans: { ...DEFAULT_MEAL_PLANS },
+  dayPlanIds: {},
+  daySnapshots: {},
+  migrationVersion: CURRENT_MIGRATION_VERSION,
 };
 
 const LOCAL_STORAGE_KEY = 'cutboard_all_data';
@@ -73,9 +102,87 @@ interface DataContextType {
   setDayType: (date: string, type: 'A' | 'B') => void;
   getDayType: (date: string) => 'A' | 'B';
   forceSync: () => Promise<void>;
+  // NEW: Meal plan management
+  createPlan: (plan: MealPlan) => void;
+  updatePlan: (plan: MealPlan) => void;
+  deletePlan: (planId: string) => void;
+  // NEW: Day plan selection
+  setDayPlanId: (date: string, planId: string) => void;
+  getDayPlanId: (date: string) => string;
+  // NEW: Get effective plan for a day (snapshot if exists, else current plan)
+  getDayPlan: (date: string) => MealPlan | null;
+  getDaySnapshot: (date: string) => DaySnapshot | null;
+  // NEW: Day overrides
+  setDayOverride: (date: string, itemId: string, quantity: number) => void;
+  removeDayOverride: (date: string, itemId: string) => void;
+  getDayOverrides: (date: string) => ItemOverride[];
+  // NEW: Create snapshot for a day (called when tracking starts)
+  ensureDaySnapshot: (date: string) => void;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
+
+// Migration function: converts old data format to new format
+function migrateData(data: Partial<AppData>): AppData {
+  const today = new Date().toISOString().split('T')[0];
+
+  // Start with defaults merged with existing data
+  const migrated: AppData = {
+    ...DEFAULT_DATA,
+    ...data,
+    profile: { ...DEFAULT_DATA.profile, ...data?.profile },
+    mealPlans: data.mealPlans && Object.keys(data.mealPlans).length > 0
+      ? data.mealPlans
+      : { ...DEFAULT_MEAL_PLANS },
+    dayPlanIds: data.dayPlanIds || {},
+    daySnapshots: data.daySnapshots || {},
+  };
+
+  // Check if we need to migrate
+  const needsMigration = !data.migrationVersion || data.migrationVersion < CURRENT_MIGRATION_VERSION;
+
+  if (needsMigration && data.dayTypes && Object.keys(data.dayTypes).length > 0) {
+    console.log('Migrating old data to new format...');
+
+    // Migrate dayTypes to dayPlanIds and create snapshots for historical days
+    for (const [date, dayType] of Object.entries(data.dayTypes)) {
+      // Skip today - it should use current editable plans
+      if (date === today) continue;
+
+      // Map old day type to new plan ID
+      const planId = dayType === 'A' ? 'default-plan-a' : 'default-plan-b';
+
+      // Set the day plan ID if not already set
+      if (!migrated.dayPlanIds[date]) {
+        migrated.dayPlanIds[date] = planId;
+      }
+
+      // Create snapshot for historical days (preserves the exact plan data)
+      if (!migrated.daySnapshots[date]) {
+        const plan = dayType === 'A' ? DEFAULT_PLAN_A : DEFAULT_PLAN_B;
+        migrated.daySnapshots[date] = {
+          planId: plan.id,
+          planName: plan.name,
+          meals: JSON.parse(JSON.stringify(plan.meals)), // Deep clone
+          overrides: [],
+        };
+      }
+    }
+
+    console.log(`Migrated ${Object.keys(data.dayTypes).length} days`);
+  }
+
+  // Set migration version
+  migrated.migrationVersion = CURRENT_MIGRATION_VERSION;
+
+  return migrated;
+}
+
+// Deep merge helper for nested objects
+function deepMergeData(target: AppData, source: Partial<AppData>): AppData {
+  const result = migrateData(source);
+  return result;
+}
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(DEFAULT_DATA);
@@ -102,13 +209,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
             // Only update if server has newer data
             const localLastSync = data.lastSync;
             if (!localLastSync || serverData.lastSync > localLastSync) {
-              const merged = {
-                ...DEFAULT_DATA,
-                ...serverData,
-                profile: { ...DEFAULT_DATA.profile, ...serverData?.profile },
-              };
-              setData(merged);
-              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+              const migrated = migrateData(serverData);
+              setData(migrated);
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(migrated));
               console.log('Refreshed from server:', serverData.lastSync);
             }
           }
@@ -147,11 +250,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        setData({
-          ...DEFAULT_DATA,
-          ...parsed,
-          profile: { ...DEFAULT_DATA.profile, ...parsed?.profile },
-        });
+        const migrated = migrateData(parsed);
+        setData(migrated);
       }
     } catch (e) {
       console.error('Failed to load from localStorage:', e);
@@ -163,13 +263,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const serverData = await response.json();
         if (serverData) {
-          const merged = {
-            ...DEFAULT_DATA,
-            ...serverData,
-            profile: { ...DEFAULT_DATA.profile, ...serverData?.profile },
-          };
-          setData(merged);
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+          const migrated = migrateData(serverData);
+          setData(migrated);
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(migrated));
         }
       }
     } catch (e) {
@@ -297,6 +393,170 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await syncToServer(data);
   }, [data, syncToServer]);
 
+  // ============ NEW MEAL PLAN METHODS ============
+
+  // Create a new plan
+  const createPlan = useCallback((plan: MealPlan) => {
+    updateData(prev => ({
+      ...prev,
+      mealPlans: { ...prev.mealPlans, [plan.id]: plan },
+    }));
+  }, [updateData]);
+
+  // Update an existing plan
+  const updatePlan = useCallback((plan: MealPlan) => {
+    updateData(prev => ({
+      ...prev,
+      mealPlans: { ...prev.mealPlans, [plan.id]: plan },
+    }));
+  }, [updateData]);
+
+  // Delete a plan
+  const deletePlan = useCallback((planId: string) => {
+    updateData(prev => {
+      const newPlans = { ...prev.mealPlans };
+      delete newPlans[planId];
+      return { ...prev, mealPlans: newPlans };
+    });
+  }, [updateData]);
+
+  // Set which plan is used for a specific day
+  const setDayPlanId = useCallback((date: string, planId: string) => {
+    updateData(prev => ({
+      ...prev,
+      dayPlanIds: { ...prev.dayPlanIds, [date]: planId },
+      // Also update legacy dayTypes for backwards compatibility
+      dayTypes: {
+        ...prev.dayTypes,
+        [date]: planId === 'default-plan-a' ? 'A' : 'B',
+      },
+    }));
+  }, [updateData]);
+
+  // Get the plan ID for a specific day
+  const getDayPlanId = useCallback((date: string): string => {
+    // First check new dayPlanIds
+    if (data.dayPlanIds?.[date]) {
+      return data.dayPlanIds[date];
+    }
+    // Fall back to legacy dayTypes mapping
+    const legacyType = data.dayTypes?.[date];
+    if (legacyType) {
+      return legacyType === 'A' ? 'default-plan-a' : 'default-plan-b';
+    }
+    // Default to plan A
+    return 'default-plan-a';
+  }, [data.dayPlanIds, data.dayTypes]);
+
+  // Get the effective plan for a day (uses snapshot if available, else current plan)
+  const getDayPlan = useCallback((date: string): MealPlan | null => {
+    // First check if there's a snapshot for this day
+    const snapshot = data.daySnapshots?.[date];
+    if (snapshot) {
+      // Return the snapshot as a MealPlan
+      return {
+        id: snapshot.planId,
+        name: snapshot.planName,
+        meals: snapshot.meals,
+      };
+    }
+
+    // Otherwise, get the current plan
+    const planId = getDayPlanId(date);
+    return data.mealPlans?.[planId] || null;
+  }, [data.daySnapshots, data.mealPlans, getDayPlanId]);
+
+  // Get the snapshot for a specific day (if exists)
+  const getDaySnapshot = useCallback((date: string): DaySnapshot | null => {
+    return data.daySnapshots?.[date] || null;
+  }, [data.daySnapshots]);
+
+  // Set an override for a specific item on a specific day
+  const setDayOverride = useCallback((date: string, itemId: string, quantity: number) => {
+    updateData(prev => {
+      const existingSnapshot = prev.daySnapshots[date];
+      if (!existingSnapshot) {
+        // Need to create snapshot first
+        const planId = getDayPlanId(date);
+        const plan = prev.mealPlans[planId];
+        if (!plan) return prev;
+
+        const newSnapshot: DaySnapshot = {
+          planId: plan.id,
+          planName: plan.name,
+          meals: JSON.parse(JSON.stringify(plan.meals)),
+          overrides: [{ itemId, quantity }],
+        };
+
+        return {
+          ...prev,
+          daySnapshots: { ...prev.daySnapshots, [date]: newSnapshot },
+        };
+      }
+
+      // Update existing snapshot's overrides
+      const newOverrides = existingSnapshot.overrides.filter(o => o.itemId !== itemId);
+      newOverrides.push({ itemId, quantity });
+
+      return {
+        ...prev,
+        daySnapshots: {
+          ...prev.daySnapshots,
+          [date]: { ...existingSnapshot, overrides: newOverrides },
+        },
+      };
+    });
+  }, [updateData, getDayPlanId]);
+
+  // Remove an override for a specific item on a specific day
+  const removeDayOverride = useCallback((date: string, itemId: string) => {
+    updateData(prev => {
+      const existingSnapshot = prev.daySnapshots[date];
+      if (!existingSnapshot) return prev;
+
+      const newOverrides = existingSnapshot.overrides.filter(o => o.itemId !== itemId);
+
+      return {
+        ...prev,
+        daySnapshots: {
+          ...prev.daySnapshots,
+          [date]: { ...existingSnapshot, overrides: newOverrides },
+        },
+      };
+    });
+  }, [updateData]);
+
+  // Get all overrides for a specific day
+  const getDayOverrides = useCallback((date: string): ItemOverride[] => {
+    return data.daySnapshots?.[date]?.overrides || [];
+  }, [data.daySnapshots]);
+
+  // Ensure a snapshot exists for a day (called when tracking starts)
+  const ensureDaySnapshot = useCallback((date: string) => {
+    updateData(prev => {
+      // If snapshot already exists, do nothing
+      if (prev.daySnapshots[date]) return prev;
+
+      // Get the plan for this day
+      const planId = prev.dayPlanIds[date] || getDayPlanId(date);
+      const plan = prev.mealPlans[planId];
+      if (!plan) return prev;
+
+      // Create new snapshot
+      const newSnapshot: DaySnapshot = {
+        planId: plan.id,
+        planName: plan.name,
+        meals: JSON.parse(JSON.stringify(plan.meals)),
+        overrides: [],
+      };
+
+      return {
+        ...prev,
+        daySnapshots: { ...prev.daySnapshots, [date]: newSnapshot },
+      };
+    });
+  }, [updateData, getDayPlanId]);
+
   return (
     <DataContext.Provider value={{
       data,
@@ -311,6 +571,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setDayType,
       getDayType,
       forceSync,
+      // New meal plan methods
+      createPlan,
+      updatePlan,
+      deletePlan,
+      setDayPlanId,
+      getDayPlanId,
+      getDayPlan,
+      getDaySnapshot,
+      setDayOverride,
+      removeDayOverride,
+      getDayOverrides,
+      ensureDaySnapshot,
     }}>
       {children}
     </DataContext.Provider>

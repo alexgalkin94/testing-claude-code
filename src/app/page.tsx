@@ -3,15 +3,17 @@
 import { useState, useMemo } from 'react';
 import { format, subDays, addDays, isToday, differenceInDays } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Check, ChevronDown, Scale, Flame, TrendingDown, TrendingUp, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff, Pencil, Target, Plus } from 'lucide-react';
+import { Check, ChevronDown, Scale, Flame, TrendingDown, TrendingUp, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff, Pencil, Target, Plus, MoreHorizontal } from 'lucide-react';
 import Card from '@/components/Card';
 import { useData } from '@/lib/data-store';
 import {
-  DAY_A,
-  DAY_B,
-  DayPlan,
+  MealPlan,
   MealItem,
   Meal,
+  getItemTotals,
+  getMealTotals,
+  getPlanTotals,
+  ItemOverride,
 } from '@/lib/mealPlan';
 
 const MealIcon = ({ icon, className, size = 16 }: { icon: 'sunrise' | 'sun' | 'sunset' | 'cookie'; className?: string; size?: number }) => {
@@ -25,7 +27,22 @@ const MealIcon = ({ icon, className, size = 16 }: { icon: 'sunrise' | 'sun' | 's
 };
 
 export default function TodayPage() {
-  const { data, isLoading, isSyncing, lastSyncError, toggleChecklistItem, setChecklistItems, setExtraCalories, setDayType, getDayType, addWeight } = useData();
+  const {
+    data,
+    isLoading,
+    isSyncing,
+    lastSyncError,
+    toggleChecklistItem,
+    setChecklistItems,
+    setExtraCalories,
+    addWeight,
+    getDayPlan,
+    getDayPlanId,
+    setDayPlanId,
+    getDayOverrides,
+    setDayOverride,
+    ensureDaySnapshot,
+  } = useData();
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [showWeightInput, setShowWeightInput] = useState(false);
@@ -33,13 +50,16 @@ export default function TodayPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showExtraInput, setShowExtraInput] = useState(false);
   const [extraInput, setExtraInput] = useState('');
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingQuantity, setEditingQuantity] = useState('');
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
-  // Get day type for selected date
-  const selectedDayType = getDayType(selectedDateStr);
-  const plan: DayPlan = selectedDayType === 'A' ? DAY_A : DAY_B;
+  // Get plan for selected date (uses snapshot if available, else current plan)
+  const plan = getDayPlan(selectedDateStr);
+  const selectedPlanId = getDayPlanId(selectedDateStr);
+  const dayOverrides = getDayOverrides(selectedDateStr);
 
   // Get extra calories for selected date
   const extraCalories = data.extraCalories?.[selectedDateStr] || 0;
@@ -50,10 +70,14 @@ export default function TodayPage() {
   }, [data.checklist, selectedDateStr]);
 
   const handleToggle = (itemId: string) => {
+    // Ensure snapshot exists when tracking starts
+    ensureDaySnapshot(selectedDateStr);
     toggleChecklistItem(selectedDateStr, itemId);
   };
 
   const handleToggleMeal = (meal: Meal) => {
+    // Ensure snapshot exists when tracking starts
+    ensureDaySnapshot(selectedDateStr);
     const mealItemIds = meal.items.map(i => i.id);
     const currentItems = data.checklist[selectedDateStr] || [];
     const allChecked = mealItemIds.every(id => currentItems.includes(id));
@@ -69,8 +93,23 @@ export default function TodayPage() {
     }
   };
 
-  const handleDayChange = (type: 'A' | 'B') => {
-    setDayType(selectedDateStr, type);
+  const handlePlanChange = (planId: string) => {
+    setDayPlanId(selectedDateStr, planId);
+  };
+
+  const handleOverrideQuantity = (itemId: string) => {
+    const qty = parseFloat(editingQuantity);
+    if (!isNaN(qty) && qty >= 0) {
+      setDayOverride(selectedDateStr, itemId, qty);
+    }
+    setEditingItemId(null);
+    setEditingQuantity('');
+  };
+
+  // Get override quantity for an item
+  const getOverrideForItem = (itemId: string): number | undefined => {
+    const override = dayOverrides.find(o => o.itemId === itemId);
+    return override?.quantity;
   };
 
   const toggleExpanded = (itemId: string) => {
@@ -104,6 +143,7 @@ export default function TodayPage() {
 
   // Calculate streak
   const streak = useMemo(() => {
+    if (!plan) return 0;
     let count = 0;
     const totalItemsNeeded = plan.meals.reduce((sum, meal) => sum + meal.items.length, 0);
     for (let i = 0; i < 365; i++) {
@@ -116,10 +156,10 @@ export default function TodayPage() {
       }
     }
     return count;
-  }, [data.checklist, plan.meals]);
+  }, [data.checklist, plan]);
 
   const completedCount = checkedItems.size;
-  const totalItems = plan.meals.reduce((sum, meal) => sum + meal.items.length, 0);
+  const totalItems = plan?.meals.reduce((sum, meal) => sum + meal.items.length, 0) || 0;
   const progressPercent = totalItems > 0 ? (completedCount / totalItems) * 100 : 0;
 
   // Get weight for selected date (or nearest previous weight)
@@ -138,20 +178,30 @@ export default function TodayPage() {
   const totalLoss = data.profile.startWeight - data.profile.currentWeight;
   const remaining = data.profile.currentWeight - data.profile.goalWeight;
 
+  // Calculate consumed macros using new structure with overrides
   const consumed = useMemo(() => {
+    if (!plan) return { calories: 0, protein: 0, carbs: 0, fat: 0 };
     const result = { calories: 0, protein: 0, carbs: 0, fat: 0 };
     plan.meals.forEach(meal => {
       meal.items.forEach(item => {
         if (checkedItems.has(item.id)) {
-          result.calories += item.calories;
-          result.protein += item.protein;
-          result.carbs += item.carbs;
-          result.fat += item.fat;
+          const override = dayOverrides.find(o => o.itemId === item.id);
+          const totals = getItemTotals(item, override?.quantity);
+          result.calories += totals.calories;
+          result.protein += totals.protein;
+          result.carbs += totals.carbs;
+          result.fat += totals.fat;
         }
       });
     });
     return result;
-  }, [plan.meals, checkedItems]);
+  }, [plan, checkedItems, dayOverrides]);
+
+  // Calculate plan totals (all items, for display)
+  const planTotals = useMemo(() => {
+    if (!plan) return { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    return getPlanTotals(plan, dayOverrides);
+  }, [plan, dayOverrides]);
 
   // Total calories including extras
   const totalConsumedCalories = consumed.calories + extraCalories;
@@ -545,31 +595,24 @@ export default function TodayPage() {
 
           </>
 
-          {/* Day Toggle - Desktop Only */}
+          {/* Plan Toggle - Desktop Only */}
           <div className="hidden lg:block">
             <Card className="p-4">
-              <p className="text-sm text-zinc-400 mb-3">Tagesplan</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleDayChange('A')}
-                  className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border transition-all ${
-                    selectedDayType === 'A'
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent text-zinc-400 border-zinc-700 hover:border-zinc-600'
-                  }`}
-                >
-                  Tag A
-                </button>
-                <button
-                  onClick={() => handleDayChange('B')}
-                  className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border transition-all ${
-                    selectedDayType === 'B'
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent text-zinc-400 border-zinc-700 hover:border-zinc-600'
-                  }`}
-                >
-                  Tag B
-                </button>
+              <p className="text-sm text-zinc-400 mb-3">Ernährungsplan</p>
+              <div className="flex flex-col gap-2">
+                {Object.values(data.mealPlans).map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => handlePlanChange(p.id)}
+                    className={`py-2.5 px-3 rounded-lg text-sm font-medium border transition-all text-left ${
+                      selectedPlanId === p.id
+                        ? 'bg-white text-black border-white'
+                        : 'bg-transparent text-zinc-400 border-zinc-700 hover:border-zinc-600'
+                    }`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
               </div>
             </Card>
           </div>
@@ -582,10 +625,10 @@ export default function TodayPage() {
                 <span className="text-sm text-zinc-500">{completedCount}/{totalItems}</span>
               </div>
               <div className="space-y-3">
-                <MacroBar label="Kalorien" current={totalConsumedCalories} total={plan.totals.calories} unit="kcal" extra={extraCalories} />
-                <MacroBar label="Protein" current={consumed.protein} total={plan.totals.protein} unit="g" color="emerald" />
-                <MacroBar label="Carbs" current={consumed.carbs} total={plan.totals.carbs} unit="g" color="blue" />
-                <MacroBar label="Fett" current={consumed.fat} total={plan.totals.fat} unit="g" color="orange" />
+                <MacroBar label="Kalorien" current={totalConsumedCalories} total={planTotals.calories} unit="kcal" extra={extraCalories} />
+                <MacroBar label="Protein" current={consumed.protein} total={planTotals.protein} unit="g" color="emerald" />
+                <MacroBar label="Carbs" current={consumed.carbs} total={planTotals.carbs} unit="g" color="blue" />
+                <MacroBar label="Fett" current={consumed.fat} total={planTotals.fat} unit="g" color="orange" />
               </div>
               {/* Extra Calories Input */}
               <div className="mt-4 pt-4 border-t border-zinc-800">
@@ -637,28 +680,21 @@ export default function TodayPage() {
 
         {/* Right Column - Meals */}
         <div className="lg:col-span-8">
-          {/* Day Toggle - Mobile - Refined */}
-          <div className="flex gap-3 mb-4 lg:hidden">
-            <button
-              onClick={() => handleDayChange('A')}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                selectedDayType === 'A'
-                  ? 'bg-white text-black'
-                  : 'bg-zinc-900/50 text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              Tag A
-            </button>
-            <button
-              onClick={() => handleDayChange('B')}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                selectedDayType === 'B'
-                  ? 'bg-white text-black'
-                  : 'bg-zinc-900/50 text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              Tag B
-            </button>
+          {/* Plan Toggle - Mobile */}
+          <div className="flex gap-2 mb-4 lg:hidden overflow-x-auto pb-1">
+            {Object.values(data.mealPlans).map((p) => (
+              <button
+                key={p.id}
+                onClick={() => handlePlanChange(p.id)}
+                className={`flex-shrink-0 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                  selectedPlanId === p.id
+                    ? 'bg-white text-black'
+                    : 'bg-zinc-900/50 text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {p.name}
+              </button>
+            ))}
           </div>
 
           {/* Macros Summary - Mobile - Elegant design */}
@@ -675,22 +711,22 @@ export default function TodayPage() {
               <div className="p-3 text-center">
                 <span className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">kcal</span>
                 <p className="text-lg font-semibold tracking-tight mt-1">{totalConsumedCalories}</p>
-                <p className="text-[10px] text-zinc-600">von {plan.totals.calories}</p>
+                <p className="text-[10px] text-zinc-600">von {planTotals.calories}</p>
               </div>
               <div className="p-3 text-center">
                 <span className="text-[10px] uppercase tracking-wider text-emerald-500/70 font-medium">Protein</span>
                 <p className="text-lg font-semibold tracking-tight mt-1">{consumed.protein}<span className="text-xs text-zinc-500">g</span></p>
-                <p className="text-[10px] text-zinc-600">von {plan.totals.protein}g</p>
+                <p className="text-[10px] text-zinc-600">von {planTotals.protein}g</p>
               </div>
               <div className="p-3 text-center">
                 <span className="text-[10px] uppercase tracking-wider text-blue-400/70 font-medium">Carbs</span>
                 <p className="text-lg font-semibold tracking-tight mt-1">{consumed.carbs}<span className="text-xs text-zinc-500">g</span></p>
-                <p className="text-[10px] text-zinc-600">von {plan.totals.carbs}g</p>
+                <p className="text-[10px] text-zinc-600">von {planTotals.carbs}g</p>
               </div>
               <div className="p-3 text-center">
                 <span className="text-[10px] uppercase tracking-wider text-orange-400/70 font-medium">Fett</span>
                 <p className="text-lg font-semibold tracking-tight mt-1">{consumed.fat}<span className="text-xs text-zinc-500">g</span></p>
-                <p className="text-[10px] text-zinc-600">von {plan.totals.fat}g</p>
+                <p className="text-[10px] text-zinc-600">von {planTotals.fat}g</p>
               </div>
             </div>
             {/* Extra Calories - elegant footer */}
@@ -759,7 +795,7 @@ export default function TodayPage() {
 
           {/* Meals Grid */}
           <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-            {plan.meals.map(meal => {
+            {plan?.meals.map(meal => {
               const mealItemIds = meal.items.map(i => i.id);
               const mealCheckedCount = mealItemIds.filter(id => checkedItems.has(id)).length;
               const allMealChecked = mealCheckedCount === meal.items.length;
@@ -808,6 +844,20 @@ export default function TodayPage() {
                         expanded={expandedItems.has(item.id)}
                         onToggle={() => handleToggle(item.id)}
                         onExpand={() => toggleExpanded(item.id)}
+                        overrideQuantity={getOverrideForItem(item.id)}
+                        onOverrideClick={() => {
+                          if (editingItemId === item.id) {
+                            setEditingItemId(null);
+                            setEditingQuantity('');
+                          } else {
+                            setEditingItemId(item.id);
+                            setEditingQuantity(getOverrideForItem(item.id)?.toString() || item.quantity.toString());
+                          }
+                        }}
+                        isEditing={editingItemId === item.id}
+                        editingValue={editingQuantity}
+                        onEditingChange={setEditingQuantity}
+                        onEditingSave={() => handleOverrideQuantity(item.id)}
                       />
                     ))}
                   </div>
@@ -863,14 +913,29 @@ function MealItemRow({
   expanded,
   onToggle,
   onExpand,
+  overrideQuantity,
+  onOverrideClick,
+  isEditing,
+  editingValue,
+  onEditingChange,
+  onEditingSave,
 }: {
   item: MealItem;
   checked: boolean;
   expanded: boolean;
   onToggle: () => void;
   onExpand: () => void;
+  overrideQuantity?: number;
+  onOverrideClick?: () => void;
+  isEditing?: boolean;
+  editingValue?: string;
+  onEditingChange?: (value: string) => void;
+  onEditingSave?: () => void;
 }) {
   const hasOptions = item.options && item.options.length > 0;
+  const effectiveQuantity = overrideQuantity ?? item.quantity;
+  const totals = getItemTotals(item, effectiveQuantity);
+  const hasOverride = overrideQuantity !== undefined && overrideQuantity !== item.quantity;
 
   return (
     <div className={`rounded-lg transition-colors ${checked ? 'bg-emerald-500/5' : 'bg-zinc-800/50 hover:bg-zinc-800'}`}>
@@ -889,7 +954,9 @@ function MealItemRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className={`text-sm ${checked ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
+              {effectiveQuantity !== 1 && `${effectiveQuantity}${item.unit === 'g' || item.unit === 'ml' ? item.unit : '× '}`}
               {item.name}
+              {hasOverride && <span className="text-orange-400 ml-1 text-xs">(angepasst)</span>}
             </span>
             {hasOptions && (
               <button onClick={onExpand} className="text-zinc-600 hover:text-zinc-400">
@@ -898,13 +965,53 @@ function MealItemRow({
             )}
           </div>
           <div className="flex gap-3 mt-1 text-xs text-zinc-500">
-            <span>{item.calories} kcal</span>
-            <span>{item.protein}g P</span>
+            <span>{totals.calories} kcal</span>
+            <span>{totals.protein}g P</span>
           </div>
         </div>
+
+        {/* Override button - subtle */}
+        {onOverrideClick && (
+          <button
+            onClick={onOverrideClick}
+            className="p-1.5 text-zinc-600 hover:text-zinc-400 transition-colors"
+            title="Menge anpassen"
+          >
+            <MoreHorizontal size={16} />
+          </button>
+        )}
       </div>
 
-      {hasOptions && expanded && (
+      {/* Override input */}
+      {isEditing && (
+        <div className="px-3 pb-3 pt-1">
+          <div className="flex items-center gap-2 pl-8">
+            <span className="text-xs text-zinc-500">Menge heute:</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={editingValue}
+              onChange={(e) => onEditingChange?.(e.target.value)}
+              className="w-20 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm"
+              placeholder={item.quantity.toString()}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onEditingSave?.();
+                if (e.key === 'Escape') onOverrideClick?.();
+              }}
+            />
+            <span className="text-xs text-zinc-500">{item.unit}</span>
+            <button
+              onClick={onEditingSave}
+              className="bg-white text-black px-2 py-1 rounded text-xs font-medium"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {hasOptions && expanded && !isEditing && (
         <div className="px-3 pb-3">
           <div className="pl-8 space-y-1">
             {item.options!.map((option, i) => (

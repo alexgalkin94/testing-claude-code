@@ -8,11 +8,13 @@ import {
   Camera,
   ShoppingCart,
   Settings,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { useData } from '@/lib/data-store';
 
 const allNavItems = [
   { href: '/', icon: LayoutDashboard, label: 'Heute' },
+  { href: '/plans', icon: UtensilsCrossed, label: 'Pläne' },
   { href: '/weight', icon: Scale, label: 'Gewicht' },
   { href: '/photos', icon: Camera, label: 'Fotos' },
   { href: '/shopping', icon: ShoppingCart, label: 'Einkauf' },
