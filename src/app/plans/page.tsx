@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Trash2, ChevronLeft, ChevronDown, ChevronUp, GripVertical, X, Check, Sunrise, Sun, Sunset, Cookie } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronDown, ChevronUp, X, Check, Sunrise, Sun, Sunset, Cookie, Download } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -14,7 +14,15 @@ import {
   DragEndEvent,
   useDroppable,
   useDraggable,
+  closestCenter,
 } from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
@@ -48,39 +56,48 @@ const MealIcon = ({ icon, size = 16 }: { icon: string; size?: number }) => {
 function DraggableItem({ id, mealId, children }: { id: string; mealId: string; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id,
-    data: { mealId },
+    data: { mealId, type: 'item' },
   });
 
   return (
     <div
       ref={setNodeRef}
-      className={`relative ${isDragging ? 'opacity-50' : ''}`}
+      {...attributes}
+      {...listeners}
+      className={`cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'opacity-50' : ''}`}
     >
-      <div
-        {...attributes}
-        {...listeners}
-        className="absolute left-0 top-0 bottom-0 w-8 flex items-center justify-center cursor-grab active:cursor-grabbing text-zinc-600 hover:text-zinc-400 touch-none"
-      >
-        <GripVertical size={14} />
-      </div>
-      <div className="pl-8">
-        {children}
-      </div>
+      {children}
     </div>
   );
 }
 
-// Droppable meal zone
-function DroppableMeal({ id, children, isOver }: { id: string; children: React.ReactNode; isOver?: boolean }) {
-  const { setNodeRef, isOver: dropping } = useDroppable({ id });
-  const highlight = isOver !== undefined ? isOver : dropping;
+// Sortable meal wrapper (for reordering meals + accepting item drops)
+function SortableMeal({ id, children }: { id: string; children: React.ReactNode }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, data: { type: 'meal' } });
+
+  const { isOver } = useDroppable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   return (
     <div
       ref={setNodeRef}
-      className={`transition-colors rounded-lg ${highlight ? 'ring-2 ring-amber-500/50' : ''}`}
+      style={style}
+      className={`transition-colors rounded-lg ${isDragging ? 'opacity-50 z-50' : ''} ${isOver ? 'ring-2 ring-amber-500/50' : ''}`}
     >
-      {children}
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+        {children}
+      </div>
     </div>
   );
 }
@@ -89,6 +106,46 @@ function DroppableMeal({ id, children, isOver }: { id: string; children: React.R
 function AnimatedList({ children, className }: { children: React.ReactNode; className?: string }) {
   const [parent] = useAutoAnimate();
   return <div ref={parent} className={className}>{children}</div>;
+}
+
+// Export formats
+type ExportFormat = 'json' | 'table' | 'text';
+
+function exportPlan(plan: MealPlan, format: ExportFormat): string {
+  if (format === 'json') {
+    return JSON.stringify(plan, null, 2);
+  }
+
+  if (format === 'table') {
+    let output = `# ${plan.name}\n\n`;
+    output += `| Mahlzeit | Item | Menge | kcal | Protein | Carbs | Fett |\n`;
+    output += `|----------|------|-------|------|---------|-------|------|\n`;
+    for (const meal of plan.meals) {
+      for (const item of meal.items) {
+        const divisor = (item.unit === 'g' || item.unit === 'ml') ? 100 : 1;
+        const kcal = Math.round(item.caloriesPer * item.quantity / divisor);
+        const p = Math.round(item.proteinPer * item.quantity / divisor * 10) / 10;
+        const c = Math.round(item.carbsPer * item.quantity / divisor * 10) / 10;
+        const f = Math.round(item.fatPer * item.quantity / divisor * 10) / 10;
+        output += `| ${meal.name} | ${item.quantity}${item.unit} ${item.name} | ${item.quantity}${item.unit} | ${kcal} | ${p}g | ${c}g | ${f}g |\n`;
+      }
+    }
+    return output;
+  }
+
+  // text format
+  let output = `${plan.name}\n${'='.repeat(plan.name.length)}\n\n`;
+  for (const meal of plan.meals) {
+    output += `${meal.name} (${meal.time}):\n`;
+    for (const item of meal.items) {
+      const divisor = (item.unit === 'g' || item.unit === 'ml') ? 100 : 1;
+      const kcal = Math.round(item.caloriesPer * item.quantity / divisor);
+      const p = Math.round(item.proteinPer * item.quantity / divisor * 10) / 10;
+      output += `  - ${item.quantity}${item.unit} ${item.name} (${kcal} kcal, ${p}g P)\n`;
+    }
+    output += '\n';
+  }
+  return output;
 }
 
 export default function PlansPage() {
@@ -100,9 +157,11 @@ export default function PlansPage() {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeMealId, setActiveMealId] = useState<string | null>(null);
+  const [activeType, setActiveType] = useState<'item' | 'meal' | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   // Auto-animate for smooth list animations
-  const [mealsParent] = useAutoAnimate();
   const [plansParent] = useAutoAnimate();
 
   // Sensors for both mouse/touch with activation constraints
@@ -115,30 +174,53 @@ export default function PlansPage() {
     })
   );
 
-  // Find the currently dragged item for the overlay
-  const activeItem = activeId && activeMealId && editingPlan
+  // Find the currently dragged item/meal for the overlay
+  const activeItem = activeId && activeMealId && activeType === 'item' && editingPlan
     ? editingPlan.meals.find(m => m.id === activeMealId)?.items.find(i => i.id === activeId)
+    : null;
+  const activeMeal = activeId && activeType === 'meal' && editingPlan
+    ? editingPlan.meals.find(m => m.id === activeId)
     : null;
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     setActiveId(active.id as string);
     setActiveMealId(active.data.current?.mealId as string);
+    setActiveType(active.data.current?.type as 'item' | 'meal');
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && active.data.current?.mealId !== over.id) {
-      moveItem(
-        active.data.current?.mealId as string,
-        over.id as string,
-        active.id as string
-      );
+    if (!over || !editingPlan) {
+      setActiveId(null);
+      setActiveMealId(null);
+      setActiveType(null);
+      return;
+    }
+
+    const activeData = active.data.current;
+
+    // Meal reordering
+    if (activeData?.type === 'meal') {
+      const oldIndex = editingPlan.meals.findIndex(m => m.id === active.id);
+      const newIndex = editingPlan.meals.findIndex(m => m.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+        setEditingPlan({
+          ...editingPlan,
+          meals: arrayMove(editingPlan.meals, oldIndex, newIndex),
+        });
+        setHasChanges(true);
+      }
+    }
+    // Item moving between meals
+    else if (activeData?.type === 'item' && activeData?.mealId !== over.id) {
+      moveItem(activeData.mealId as string, over.id as string, active.id as string);
     }
 
     setActiveId(null);
     setActiveMealId(null);
+    setActiveType(null);
   };
 
   const plans = Object.values(data.mealPlans);
@@ -146,14 +228,15 @@ export default function PlansPage() {
   const handleEditPlan = (plan: MealPlan) => {
     setEditingPlanId(plan.id);
     setEditingPlan(clonePlan(plan));
-    // Expand all meals by default when editing
     setExpandedMeals(new Set(plan.meals.map(m => m.id)));
+    setHasChanges(false);
   };
 
   const handleCreatePlan = () => {
     const newPlan = createEmptyPlan('Neuer Plan');
     setEditingPlanId(newPlan.id);
     setEditingPlan(newPlan);
+    setHasChanges(true);
   };
 
   const handleSavePlan = () => {
@@ -165,11 +248,21 @@ export default function PlansPage() {
       createPlan(editingPlan);
       setEditingPlanId(editingPlan.id);
     }
+    setHasChanges(false);
   };
 
   const handleCancelEdit = () => {
     setEditingPlanId(null);
     setEditingPlan(null);
+    setHasChanges(false);
+    setShowExportMenu(false);
+  };
+
+  const handleExport = async (format: ExportFormat) => {
+    if (!editingPlan) return;
+    const text = exportPlan(editingPlan, format);
+    await navigator.clipboard.writeText(text);
+    setShowExportMenu(false);
   };
 
   const handleDeletePlan = (planId: string) => {
@@ -186,6 +279,7 @@ export default function PlansPage() {
   const updatePlanName = (name: string) => {
     if (!editingPlan) return;
     setEditingPlan({ ...editingPlan, name });
+    setHasChanges(true);
   };
 
   const addMeal = () => {
@@ -196,6 +290,7 @@ export default function PlansPage() {
       meals: [...editingPlan.meals, newMeal],
     });
     setExpandedMeals(prev => new Set([...prev, newMeal.id]));
+    setHasChanges(true);
   };
 
   const updateMeal = (mealId: string, updates: Partial<Meal>) => {
@@ -206,6 +301,7 @@ export default function PlansPage() {
         m.id === mealId ? { ...m, ...updates } : m
       ),
     });
+    setHasChanges(true);
   };
 
   const deleteMeal = (mealId: string) => {
@@ -214,6 +310,7 @@ export default function PlansPage() {
       ...editingPlan,
       meals: editingPlan.meals.filter(m => m.id !== mealId),
     });
+    setHasChanges(true);
   };
 
   const addItem = (mealId: string) => {
@@ -228,6 +325,7 @@ export default function PlansPage() {
       ),
     });
     setExpandedItems(prev => new Set([...prev, newItem.id]));
+    setHasChanges(true);
   };
 
   const updateItem = (mealId: string, itemId: string, updates: Partial<MealItem>) => {
@@ -245,6 +343,7 @@ export default function PlansPage() {
           : m
       ),
     });
+    setHasChanges(true);
   };
 
   const deleteItem = (mealId: string, itemId: string) => {
@@ -257,6 +356,7 @@ export default function PlansPage() {
           : m
       ),
     });
+    setHasChanges(true);
   };
 
   const moveItem = (fromMealId: string, toMealId: string, itemId: string) => {
@@ -277,6 +377,7 @@ export default function PlansPage() {
         return m;
       }),
     });
+    setHasChanges(true);
   };
 
   const addAlternative = (mealId: string, itemId: string) => {
@@ -297,6 +398,7 @@ export default function PlansPage() {
           : m
       ),
     });
+    setHasChanges(true);
   };
 
   const updateAlternative = (mealId: string, itemId: string, altId: string, updates: Partial<MealItem>) => {
@@ -321,6 +423,7 @@ export default function PlansPage() {
           : m
       ),
     });
+    setHasChanges(true);
   };
 
   const deleteAlternative = (mealId: string, itemId: string, altId: string) => {
@@ -340,6 +443,7 @@ export default function PlansPage() {
           : m
       ),
     });
+    setHasChanges(true);
   };
 
   const toggleMealExpanded = (mealId: string) => {
@@ -383,9 +487,23 @@ export default function PlansPage() {
               placeholder="Plan Name"
             />
           </div>
-          <Button onClick={handleSavePlan} size="sm">
-            <Check size={16} className="mr-1" /> Speichern
-          </Button>
+          <div className="flex gap-2">
+            <div className="relative">
+              <Button onClick={() => setShowExportMenu(!showExportMenu)} size="sm" variant="secondary">
+                <Download size={16} />
+              </Button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-10 py-1 min-w-[120px]">
+                  <button onClick={() => handleExport('text')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">Text</button>
+                  <button onClick={() => handleExport('table')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">Tabelle</button>
+                  <button onClick={() => handleExport('json')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">JSON</button>
+                </div>
+              )}
+            </div>
+            <Button onClick={handleSavePlan} size="sm" disabled={!hasChanges}>
+              <Check size={16} className="mr-1" /> Speichern
+            </Button>
+          </div>
         </div>
 
         {/* Plan Summary */}
@@ -411,14 +529,15 @@ export default function PlansPage() {
         </Card>
 
         {/* Meals */}
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div ref={mealsParent} className="space-y-4">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <SortableContext items={editingPlan.meals.map(m => m.id)} strategy={verticalListSortingStrategy}>
+        <div className="space-y-4">
           {editingPlan.meals.map((meal) => {
             const mealTotals = getMealTotals(meal);
             const isExpanded = expandedMeals.has(meal.id);
 
             return (
-              <DroppableMeal key={meal.id} id={meal.id}>
+              <SortableMeal key={meal.id} id={meal.id}>
               <Card className="p-0 overflow-hidden">
                 {/* Meal Header */}
                 <div
@@ -550,11 +669,11 @@ export default function PlansPage() {
                                           onChange={(v) => updateItem(meal.id, item.id, { quantity: parseFloat(v) || 0 })}
                                         />
                                         <div>
-                                          <label className="block text-xs text-zinc-500 mb-1">Einheit</label>
+                                          <label className="block text-sm text-zinc-400 mb-1.5">Einheit</label>
                                           <select
                                             value={item.unit}
                                             onChange={(e) => updateItem(meal.id, item.id, { unit: e.target.value })}
-                                            className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm"
+                                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-zinc-600"
                                           >
                                             <option value="g">g</option>
                                             <option value="ml">ml</option>
@@ -631,11 +750,11 @@ export default function PlansPage() {
                                           onChange={(v) => updateItem(meal.id, item.id, { quantity: parseFloat(v) || 0 })}
                                         />
                                         <div>
-                                          <label className="block text-xs text-zinc-500 mb-1">Einheit</label>
+                                          <label className="block text-sm text-zinc-400 mb-1.5">Einheit</label>
                                           <select
                                             value={item.unit}
                                             onChange={(e) => updateItem(meal.id, item.id, { unit: e.target.value })}
-                                            className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm"
+                                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-zinc-600"
                                           >
                                             <option value="g">g</option>
                                             <option value="ml">ml</option>
@@ -714,7 +833,7 @@ export default function PlansPage() {
                                               <select
                                                 value={alt.unit}
                                                 onChange={(e) => updateAlternative(meal.id, item.id, alt.id, { unit: e.target.value })}
-                                                className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm"
+                                                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-zinc-600"
                                               >
                                                 <option value="g">g</option>
                                                 <option value="ml">ml</option>
@@ -787,7 +906,7 @@ export default function PlansPage() {
                   </div>
                 )}
               </Card>
-              </DroppableMeal>
+              </SortableMeal>
             );
           })}
 
@@ -799,21 +918,26 @@ export default function PlansPage() {
             <Plus size={16} /> Mahlzeit hinzufügen
           </button>
         </div>
+        </SortableContext>
 
         {/* Drag Overlay */}
         <DragOverlay>
           {activeItem ? (
             <div className="bg-zinc-800 rounded-lg p-3 shadow-xl border border-zinc-600 opacity-90">
-              <div className="flex items-center gap-2">
-                <GripVertical size={14} className="text-zinc-400" />
-                <span className="text-sm font-medium">
-                  {activeItem.alternatives?.length
-                    ? (activeItem.groupName || 'Optionen')
-                    : `${activeItem.quantity}${activeItem.unit === 'g' || activeItem.unit === 'ml' ? activeItem.unit : '× '} ${activeItem.name}`
-                  }
-                </span>
-              </div>
+              <span className="text-sm font-medium">
+                {activeItem.alternatives?.length
+                  ? (activeItem.groupName || 'Optionen')
+                  : `${activeItem.quantity}${activeItem.unit === 'g' || activeItem.unit === 'ml' ? activeItem.unit : '× '} ${activeItem.name}`
+                }
+              </span>
             </div>
+          ) : activeMeal ? (
+            <Card className="p-4 shadow-xl border border-zinc-600 opacity-90">
+              <div className="flex items-center gap-3">
+                <MealIcon icon={activeMeal.icon} />
+                <span className="font-medium">{activeMeal.name}</span>
+              </div>
+            </Card>
           ) : null}
         </DragOverlay>
         </DndContext>

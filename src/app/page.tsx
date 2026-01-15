@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { format, subDays, addDays, isToday, differenceInDays } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Check, ChevronDown, Scale, Flame, TrendingDown, TrendingUp, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff, Pencil, Target, Plus, MoreHorizontal } from 'lucide-react';
+import { Check, ChevronDown, Scale, Flame, TrendingDown, TrendingUp, ChevronRight, ChevronLeft, Sunrise, Sun, Sunset, Cookie, Cloud, CloudOff, Pencil, Target, Plus, MoreHorizontal, Download } from 'lucide-react';
 import Card from '@/components/Card';
 import { useData } from '@/lib/data-store';
 import {
@@ -144,6 +144,76 @@ export default function TodayPage() {
   const goToPreviousDay = () => setSelectedDate(prev => subDays(prev, 1));
   const goToNextDay = () => { if (!isToday(selectedDate)) setSelectedDate(prev => addDays(prev, 1)); };
   const goToToday = () => setSelectedDate(new Date());
+
+  const [showDayExportMenu, setShowDayExportMenu] = useState(false);
+
+  const exportDay = async (formatType: 'json' | 'table' | 'text') => {
+    if (!plan) return;
+    const dateFormatted = format(selectedDate, 'd. MMMM yyyy', { locale: de });
+
+    if (formatType === 'json') {
+      const exportData = {
+        date: selectedDateStr,
+        plan: plan.name,
+        meals: plan.meals.map(meal => ({
+          name: meal.name,
+          time: meal.time,
+          items: meal.items.map(item => {
+            const override = dayOverrides.find(o => o.itemId === item.id);
+            const effectiveItem = getEffectiveItem(item, override?.alternativeId);
+            const qty = override?.quantity ?? effectiveItem.quantity;
+            const totals = getItemTotals(effectiveItem, qty);
+            const isChecked = checkedItems.has(item.id);
+            return {
+              name: effectiveItem.name,
+              quantity: qty,
+              unit: effectiveItem.unit,
+              checked: isChecked,
+              ...totals,
+            };
+          }),
+        })),
+        consumed,
+        extraCalories,
+      };
+      await navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
+    } else if (formatType === 'table') {
+      let output = `# ${dateFormatted} - ${plan.name}\n\n`;
+      output += `| Mahlzeit | Item | Menge | kcal | Protein | Carbs | Fett | Gegessen |\n`;
+      output += `|----------|------|-------|------|---------|-------|------|----------|\n`;
+      for (const meal of plan.meals) {
+        for (const item of meal.items) {
+          const override = dayOverrides.find(o => o.itemId === item.id);
+          const effectiveItem = getEffectiveItem(item, override?.alternativeId);
+          const qty = override?.quantity ?? effectiveItem.quantity;
+          const totals = getItemTotals(effectiveItem, qty);
+          const isChecked = checkedItems.has(item.id);
+          output += `| ${meal.name} | ${effectiveItem.name} | ${qty}${effectiveItem.unit} | ${totals.calories} | ${totals.protein}g | ${totals.carbs}g | ${totals.fat}g | ${isChecked ? '✓' : ''} |\n`;
+        }
+      }
+      output += `\n**Gegessen:** ${consumed.calories} kcal, ${consumed.protein}g P, ${consumed.carbs}g C, ${consumed.fat}g F`;
+      if (extraCalories) output += `\n**Extra:** ${extraCalories} kcal`;
+      await navigator.clipboard.writeText(output);
+    } else {
+      let output = `${dateFormatted}\n${'='.repeat(dateFormatted.length)}\nPlan: ${plan.name}\n\n`;
+      for (const meal of plan.meals) {
+        output += `${meal.name} (${meal.time}):\n`;
+        for (const item of meal.items) {
+          const override = dayOverrides.find(o => o.itemId === item.id);
+          const effectiveItem = getEffectiveItem(item, override?.alternativeId);
+          const qty = override?.quantity ?? effectiveItem.quantity;
+          const totals = getItemTotals(effectiveItem, qty);
+          const isChecked = checkedItems.has(item.id);
+          output += `  ${isChecked ? '[x]' : '[ ]'} ${qty}${effectiveItem.unit} ${effectiveItem.name} (${totals.calories} kcal, ${totals.protein}g P)\n`;
+        }
+        output += '\n';
+      }
+      output += `Gegessen: ${consumed.calories} kcal, ${consumed.protein}g P, ${consumed.carbs}g C, ${consumed.fat}g F`;
+      if (extraCalories) output += `\nExtra: ${extraCalories} kcal`;
+      await navigator.clipboard.writeText(output);
+    }
+    setShowDayExportMenu(false);
+  };
 
   // Calculate streak
   const streak = useMemo(() => {
@@ -353,13 +423,30 @@ export default function TodayPage() {
               </h1>
             </div>
 
-            <button
-              onClick={goToNextDay}
-              disabled={isViewingToday}
-              className={`p-2 rounded-lg transition-colors ${isViewingToday ? 'opacity-30' : 'hover:bg-zinc-800'}`}
-            >
-              <ChevronRight size={20} className="text-zinc-400" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={goToNextDay}
+                disabled={isViewingToday}
+                className={`p-2 rounded-lg transition-colors ${isViewingToday ? 'opacity-30' : 'hover:bg-zinc-800'}`}
+              >
+                <ChevronRight size={20} className="text-zinc-400" />
+              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowDayExportMenu(!showDayExportMenu)}
+                  className="p-2 rounded-lg hover:bg-zinc-800 transition-colors"
+                >
+                  <Download size={18} className="text-zinc-400" />
+                </button>
+                {showDayExportMenu && (
+                  <div className="absolute right-0 top-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-10 py-1 min-w-[120px]">
+                    <button onClick={() => exportDay('text')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">Text</button>
+                    <button onClick={() => exportDay('table')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">Tabelle</button>
+                    <button onClick={() => exportDay('json')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">JSON</button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Stats */}
