@@ -437,7 +437,9 @@ export default function PlansPage() {
                                   </div>
                                 </div>
 
-                                <p className="text-xs text-zinc-500 font-medium mt-2">Nährwerte pro Einheit:</p>
+                                <p className="text-xs text-zinc-500 font-medium mt-2">
+                                  Nährwerte pro {item.unit === 'g' ? '100g' : item.unit === 'ml' ? '100ml' : 'Einheit'}:
+                                </p>
                                 <div className="grid grid-cols-4 gap-2">
                                   <Input
                                     label="kcal"
