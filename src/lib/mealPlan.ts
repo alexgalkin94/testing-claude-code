@@ -3,7 +3,6 @@
 export interface MealItem {
   id: string;
   name: string;
-  options?: string[]; // Alternative choices
   // Per-unit values (e.g., per 1 egg, per 100g)
   caloriesPer: number;
   proteinPer: number;
@@ -12,6 +11,8 @@ export interface MealItem {
   // Quantity settings
   quantity: number; // Default quantity (e.g., 3 eggs)
   unit: string; // 'Stück', 'g', 'ml', 'Scheiben', etc.
+  // Alternative items (e.g., 200g rice OR 400g potatoes)
+  alternatives?: MealItem[];
 }
 
 export interface Meal {
@@ -36,10 +37,11 @@ export interface DayPlan {
   totals: { calories: number; protein: number; carbs: number; fat: number };
 }
 
-// Quantity override for a specific item on a specific day
+// Override for a specific item on a specific day
 export interface ItemOverride {
   itemId: string;
-  quantity: number; // Overridden quantity for this day
+  quantity?: number; // Overridden quantity for this day
+  alternativeId?: string; // Selected alternative (if item has alternatives)
 }
 
 // Snapshot of a day's plan with potential overrides
@@ -48,6 +50,13 @@ export interface DaySnapshot {
   planName: string;
   meals: Meal[]; // Full meal data at time of tracking
   overrides: ItemOverride[]; // Any quantity overrides for this day
+}
+
+// Get the effective item (considering selected alternative)
+export function getEffectiveItem(item: MealItem, alternativeId?: string): MealItem {
+  if (!alternativeId || !item.alternatives?.length) return item;
+  const alt = item.alternatives.find(a => a.id === alternativeId);
+  return alt || item;
 }
 
 // Helper to calculate item totals based on quantity
@@ -63,9 +72,10 @@ export function getItemTotals(item: MealItem, overrideQuantity?: number) {
 
 // Helper to calculate meal totals
 export function getMealTotals(meal: Meal, overrides: ItemOverride[] = []) {
-  return meal.items.reduce((acc, item) => {
+  const result = meal.items.reduce((acc, item) => {
     const override = overrides.find(o => o.itemId === item.id);
-    const totals = getItemTotals(item, override?.quantity);
+    const effectiveItem = getEffectiveItem(item, override?.alternativeId);
+    const totals = getItemTotals(effectiveItem, override?.quantity);
     return {
       calories: acc.calories + totals.calories,
       protein: acc.protein + totals.protein,
@@ -73,11 +83,17 @@ export function getMealTotals(meal: Meal, overrides: ItemOverride[] = []) {
       fat: acc.fat + totals.fat,
     };
   }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  return {
+    calories: Math.round(result.calories),
+    protein: Math.round(result.protein * 10) / 10,
+    carbs: Math.round(result.carbs * 10) / 10,
+    fat: Math.round(result.fat * 10) / 10,
+  };
 }
 
 // Helper to calculate plan totals
 export function getPlanTotals(plan: MealPlan, overrides: ItemOverride[] = []) {
-  return plan.meals.reduce((acc, meal) => {
+  const result = plan.meals.reduce((acc, meal) => {
     const mealTotals = getMealTotals(meal, overrides);
     return {
       calories: acc.calories + mealTotals.calories,
@@ -86,6 +102,12 @@ export function getPlanTotals(plan: MealPlan, overrides: ItemOverride[] = []) {
       fat: acc.fat + mealTotals.fat,
     };
   }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  return {
+    calories: Math.round(result.calories),
+    protein: Math.round(result.protein * 10) / 10,
+    carbs: Math.round(result.carbs * 10) / 10,
+    fat: Math.round(result.fat * 10) / 10,
+  };
 }
 
 // Default Plan A: Iglo & Potato Tag (~1718 kcal)
@@ -99,7 +121,6 @@ const PLAN_A_MEALS: Meal[] = [
       {
         id: 'carbs-breakfast',
         name: 'Kohlenhydrate',
-        options: ['Sammy\'s Sandwich', 'Toastbrötchen', 'Haferflocken'],
         caloriesPer: 96,
         proteinPer: 3,
         carbsPer: 18.3,
@@ -130,7 +151,6 @@ const PLAN_A_MEALS: Meal[] = [
       {
         id: 'schinken',
         name: 'Hinterkochschinken',
-        options: ['Hinterkochschinken', 'Backschinken'],
         caloriesPer: 1.08,
         proteinPer: 0.2,
         carbsPer: 0.02,
@@ -159,7 +179,6 @@ const PLAN_A_MEALS: Meal[] = [
       {
         id: 'iglo',
         name: 'Iglo Schlemmer-Filet',
-        options: ['Italiano', 'Broccoli', 'Champignon'],
         caloriesPer: 0.77,
         proteinPer: 0.11,
         carbsPer: 0.032,
@@ -170,7 +189,6 @@ const PLAN_A_MEALS: Meal[] = [
       {
         id: 'carbs-lunch',
         name: 'Beilage',
-        options: ['Kartoffeln', 'Süßkartoffel', 'Reis'],
         caloriesPer: 0.7,
         proteinPer: 0.016,
         carbsPer: 0.156,
@@ -189,7 +207,6 @@ const PLAN_A_MEALS: Meal[] = [
       {
         id: 'protein-dinner',
         name: 'Protein',
-        options: ['Hähnchenbrustfilet', 'Pute', 'Weißfisch', 'Garnelen'],
         caloriesPer: 1.06,
         proteinPer: 0.23,
         carbsPer: 0,
@@ -218,7 +235,6 @@ const PLAN_A_MEALS: Meal[] = [
       {
         id: 'protein-snack',
         name: 'Protein-Dessert',
-        options: ['Skyr Natur', 'Magerquark'],
         caloriesPer: 0.62,
         proteinPer: 0.11,
         carbsPer: 0.04,
@@ -247,7 +263,6 @@ const PLAN_B_MEALS: Meal[] = [
       {
         id: 'carbs-breakfast-b',
         name: 'Kohlenhydrate',
-        options: ['Sammy\'s Sandwich', 'Toastbrötchen', 'Haferflocken'],
         caloriesPer: 96,
         proteinPer: 3,
         carbsPer: 18.3,
@@ -278,7 +293,6 @@ const PLAN_B_MEALS: Meal[] = [
       {
         id: 'schinken-b',
         name: 'Hinterkochschinken',
-        options: ['Hinterkochschinken', 'Backschinken'],
         caloriesPer: 1.08,
         proteinPer: 0.2,
         carbsPer: 0.02,
@@ -307,7 +321,6 @@ const PLAN_B_MEALS: Meal[] = [
       {
         id: 'protein-lunch-b',
         name: 'Protein',
-        options: ['Hähnchenbrustfilet', 'Pute', 'Weißfisch'],
         caloriesPer: 1.06,
         proteinPer: 0.23,
         carbsPer: 0,
@@ -318,7 +331,6 @@ const PLAN_B_MEALS: Meal[] = [
       {
         id: 'carbs-lunch-b',
         name: 'Beilage',
-        options: ['Reis (trocken)', 'Nudeln', 'Kartoffeln'],
         caloriesPer: 3.49,
         proteinPer: 0.071,
         carbsPer: 0.77,
@@ -347,7 +359,6 @@ const PLAN_B_MEALS: Meal[] = [
       {
         id: 'protein-dinner-b',
         name: 'Protein',
-        options: ['Rinderhack 5%', 'Rindertartar', 'Schweinefilet'],
         caloriesPer: 1.29,
         proteinPer: 0.211,
         carbsPer: 0,
@@ -376,7 +387,6 @@ const PLAN_B_MEALS: Meal[] = [
       {
         id: 'protein-snack-b',
         name: 'Protein-Dessert',
-        options: ['Skyr Natur', 'Magerquark'],
         caloriesPer: 0.62,
         proteinPer: 0.11,
         carbsPer: 0.04,
