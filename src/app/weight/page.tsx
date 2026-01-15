@@ -9,7 +9,7 @@ import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
 import { useData } from '@/lib/data-store';
-import { DAY_A, DAY_B } from '@/lib/mealPlan';
+import { getItemTotals, getPlanTotals, DEFAULT_PLAN_A, DEFAULT_PLAN_B } from '@/lib/mealPlan';
 
 // Calculate 7-day moving average for weights
 function getMovingAverage(weights: Array<{ date: string; weight: number }>, days: number = 7): { date: string; avg: number }[] {
@@ -120,15 +120,21 @@ export default function WeightPage() {
         const dayCheckedItems = data.checklist[dateStr] || [];
         const extraCals = data.extraCalories?.[dateStr] || 0;
 
-        // Get the plan for this specific date
+        // Get the plan for this specific date (use snapshot if exists, else default plans)
+        const daySnapshot = data.daySnapshots?.[dateStr];
         const dayType = data.dayTypes?.[dateStr] || 'A';
-        const dayPlan = dayType === 'A' ? DAY_A : DAY_B;
+        const dayPlan = daySnapshot
+          ? { meals: daySnapshot.meals }
+          : (dayType === 'A' ? DEFAULT_PLAN_A : DEFAULT_PLAN_B);
+        const dayOverrides = daySnapshot?.overrides || [];
 
         let dayCalories = extraCals;
         dayPlan.meals.forEach(meal => {
           meal.items.forEach(item => {
             if (dayCheckedItems.includes(item.id)) {
-              dayCalories += item.calories;
+              const override = dayOverrides.find(o => o.itemId === item.id);
+              const totals = getItemTotals(item, override?.quantity);
+              dayCalories += totals.calories;
             }
           });
         });
@@ -165,11 +171,13 @@ export default function WeightPage() {
       weightsNeeded,
       weeklyTrend,
     };
-  }, [data.profile, data.weights, data.checklist, data.extraCalories, data.dayTypes]);
+  }, [data.profile, data.weights, data.checklist, data.extraCalories, data.dayTypes, data.daySnapshots]);
 
   // Use calculated TDEE if available, otherwise estimate based on typical deficit
   const estimatedTdee = tdeeTracking.calculatedTdee || 2200;
-  const avgDailyCalories = (DAY_A.totals.calories + DAY_B.totals.calories) / 2;
+  const planATotals = getPlanTotals(DEFAULT_PLAN_A);
+  const planBTotals = getPlanTotals(DEFAULT_PLAN_B);
+  const avgDailyCalories = (planATotals.calories + planBTotals.calories) / 2;
 
   const movingAvg = getMovingAverage(weights);
   const expectedWeights = getExpectedWeights(weights, avgDailyCalories, estimatedTdee);
