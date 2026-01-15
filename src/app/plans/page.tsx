@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import Card from '@/components/Card';
@@ -52,7 +52,11 @@ export default function PlansPage() {
           const itemsCount = plan.meals.reduce((sum, m) => sum + m.items.length, 0);
 
           return (
-            <Card key={plan.id} className="p-4">
+            <Card
+              key={plan.id}
+              className="p-4"
+              onClick={() => handleEditPlan(plan.id)}
+            >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <h3 className="font-medium text-lg">{plan.name}</h3>
@@ -66,20 +70,15 @@ export default function PlansPage() {
                     <span className="text-orange-400/70">{totals.fat}g F</span>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEditPlan(plan.id)}
-                    className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleDeletePlan(plan.id)}
-                    className="p-2 text-zinc-400 hover:text-red-500 hover:bg-zinc-800 rounded-lg"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeletePlan(plan.id);
+                  }}
+                  className="p-2 text-zinc-400 hover:text-red-500 hover:bg-zinc-800 rounded-lg"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             </Card>
           );
