@@ -1065,13 +1065,12 @@ function MealItemRow({
                   {item.groupName || 'Optionen'}
                 </span>
                 <span className="text-xs text-zinc-500">
-                  → {effectiveQuantity !== 1 && `${effectiveQuantity}${effectiveItem.unit === 'g' || effectiveItem.unit === 'ml' ? effectiveItem.unit : '× '}`}{effectiveItem.name}
+                  → {effectiveQuantity !== 1 && `${effectiveQuantity}${effectiveItem.unit === 'g' || effectiveItem.unit === 'ml' ? `${effectiveItem.unit} ` : '× '}`}{effectiveItem.name}
                 </span>
               </>
             ) : (
               <span className={`text-sm ${checked ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
-                {effectiveQuantity !== 1 && `${effectiveQuantity}${effectiveItem.unit === 'g' || effectiveItem.unit === 'ml' ? effectiveItem.unit : '× '}`}
-                {effectiveItem.name}
+                {effectiveQuantity !== 1 && `${effectiveQuantity}${effectiveItem.unit === 'g' || effectiveItem.unit === 'ml' ? `${effectiveItem.unit} ` : '× '}`}{effectiveItem.name}
               </span>
             )}
             {hasQuantityOverride && <span className="text-orange-400 ml-1 text-xs">(angepasst)</span>}
@@ -1141,7 +1140,7 @@ function MealItemRow({
               }`}
             >
               <div className={`w-3 h-3 rounded-full border ${!hasAlternativeSelected ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600'}`} />
-              {item.quantity}{item.unit === 'g' || item.unit === 'ml' ? item.unit : '× '} {item.name}
+              {item.quantity}{item.unit === 'g' || item.unit === 'ml' ? `${item.unit} ` : '× '}{item.name}
             </button>
             {item.alternatives!.map((alt) => {
               const isSelected = override?.alternativeId === alt.id;
@@ -1158,7 +1157,7 @@ function MealItemRow({
                 >
                   <div className={`w-3 h-3 rounded-full border ${isSelected ? 'bg-amber-500 border-amber-500' : 'border-zinc-600'}`} />
                   <span className="flex-1">
-                    {alt.quantity}{alt.unit === 'g' || alt.unit === 'ml' ? alt.unit : '× '} {alt.name}
+                    {alt.quantity}{alt.unit === 'g' || alt.unit === 'ml' ? `${alt.unit} ` : '× '}{alt.name}
                   </span>
                   <span className="text-zinc-600">{altTotals.calories} kcal</span>
                 </button>
