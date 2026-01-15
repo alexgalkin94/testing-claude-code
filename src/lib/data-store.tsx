@@ -61,7 +61,7 @@ export interface AppData {
   lastSync?: string;
 }
 
-const CURRENT_MIGRATION_VERSION = 2;
+const CURRENT_MIGRATION_VERSION = 3;
 
 const DEFAULT_DATA: AppData = {
   profile: {
@@ -195,6 +195,50 @@ function migrateData(data: Partial<AppData>): AppData {
       migrated.daySnapshots[date] = { ...snapshot, planId: DEFAULT_PLAN_A.id };
     } else if (snapshot.planId === 'default-plan-b') {
       migrated.daySnapshots[date] = { ...snapshot, planId: DEFAULT_PLAN_B.id };
+    }
+  }
+
+  // REPAIR MIGRATION (v3): Create snapshots for ALL historical days with checklist data
+  // This repairs data lost due to blob caching issues
+  if (data.checklist && Object.keys(data.checklist).length > 0) {
+    let repairedCount = 0;
+
+    for (const date of Object.keys(data.checklist)) {
+      // Skip today
+      if (date === today) continue;
+
+      // Skip if snapshot already exists
+      if (migrated.daySnapshots[date]) continue;
+
+      // Determine which plan was used (from dayTypes or dayPlanIds)
+      const dayType = data.dayTypes?.[date];
+      const dayPlanId = migrated.dayPlanIds[date];
+
+      let plan: typeof DEFAULT_PLAN_A;
+      if (dayType === 'B' || dayPlanId === DEFAULT_PLAN_B.id) {
+        plan = DEFAULT_PLAN_B;
+      } else {
+        plan = DEFAULT_PLAN_A;
+      }
+
+      // Create snapshot with DEFAULT_PLAN data (the original plan structure)
+      migrated.daySnapshots[date] = {
+        planId: plan.id,
+        planName: plan.name,
+        meals: JSON.parse(JSON.stringify(plan.meals)),
+        overrides: [],
+      };
+
+      // Also ensure dayPlanIds is set
+      if (!migrated.dayPlanIds[date]) {
+        migrated.dayPlanIds[date] = plan.id;
+      }
+
+      repairedCount++;
+    }
+
+    if (repairedCount > 0) {
+      console.log(`Repaired ${repairedCount} days with missing snapshots`);
     }
   }
 
@@ -474,8 +518,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return DEFAULT_PLAN_A.id;
   }, [data.dayPlanIds, data.dayTypes]);
 
-  // Get the effective plan for a day (uses snapshot if available, else current plan)
+  // Get the effective plan for a day (uses snapshot if available, else defaults for past)
   const getDayPlan = useCallback((date: string): MealPlan | null => {
+    const today = new Date().toISOString().split('T')[0];
+
     // First check if there's a snapshot for this day
     const snapshot = data.daySnapshots?.[date];
     if (snapshot) {
@@ -487,9 +533,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
       };
     }
 
-    // Otherwise, get the current plan
+    // For today: use current editable plan
+    if (date === today) {
+      const planId = getDayPlanId(date);
+      return data.mealPlans?.[planId] || null;
+    }
+
+    // For past days without snapshot: use DEFAULT_PLAN constants (not user-edited plans!)
+    // This ensures historical data isn't affected by current plan edits
     const planId = getDayPlanId(date);
-    return data.mealPlans?.[planId] || null;
+    if (planId === DEFAULT_PLAN_A.id) {
+      return DEFAULT_PLAN_A;
+    } else if (planId === DEFAULT_PLAN_B.id) {
+      return DEFAULT_PLAN_B;
+    }
+
+    // For custom plans that no longer exist, fall back to plan A
+    return DEFAULT_PLAN_A;
   }, [data.daySnapshots, data.mealPlans, getDayPlanId]);
 
   // Get the snapshot for a specific day (if exists)
@@ -497,14 +557,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return data.daySnapshots?.[date] || null;
   }, [data.daySnapshots]);
 
+  // Helper to get the correct plan for snapshot creation (DEFAULT for past, user plan for today)
+  const getPlanForSnapshot = useCallback((date: string, prevData: AppData): MealPlan | null => {
+    const today = new Date().toISOString().split('T')[0];
+    const planId = prevData.dayPlanIds[date] || getDayPlanId(date);
+
+    // For today: use current editable plan
+    if (date === today) {
+      return prevData.mealPlans[planId] || null;
+    }
+
+    // For past days: use DEFAULT_PLAN constants
+    if (planId === DEFAULT_PLAN_A.id) {
+      return DEFAULT_PLAN_A;
+    } else if (planId === DEFAULT_PLAN_B.id) {
+      return DEFAULT_PLAN_B;
+    }
+
+    return DEFAULT_PLAN_A;
+  }, [getDayPlanId]);
+
   // Set an override for a specific item on a specific day
   const setDayOverride = useCallback((date: string, itemId: string, updates: { quantity?: number; alternativeId?: string }) => {
     updateData(prev => {
       const existingSnapshot = prev.daySnapshots[date];
       if (!existingSnapshot) {
         // Need to create snapshot first
-        const planId = getDayPlanId(date);
-        const plan = prev.mealPlans[planId];
+        const plan = getPlanForSnapshot(date, prev);
         if (!plan) return prev;
 
         const newSnapshot: DaySnapshot = {
@@ -564,9 +643,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // If snapshot already exists, do nothing
       if (prev.daySnapshots[date]) return prev;
 
-      // Get the plan for this day
-      const planId = prev.dayPlanIds[date] || getDayPlanId(date);
-      const plan = prev.mealPlans[planId];
+      // Get the correct plan (DEFAULT for past, user plan for today)
+      const plan = getPlanForSnapshot(date, prev);
       if (!plan) return prev;
 
       // Create new snapshot
@@ -582,7 +660,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         daySnapshots: { ...prev.daySnapshots, [date]: newSnapshot },
       };
     });
-  }, [updateData, getDayPlanId]);
+  }, [updateData, getPlanForSnapshot]);
 
   return (
     <DataContext.Provider value={{

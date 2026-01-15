@@ -51,30 +51,19 @@ export default function WeightPage() {
   const [newWeight, setNewWeight] = useState('');
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
-  const handleSubmit = () => {
-    if (!newWeight) return;
-    addWeight(selectedDate, parseFloat(newWeight));
-    setNewWeight('');
-    setShowForm(false);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="p-4 lg:p-8 lg:max-w-3xl animate-pulse space-y-4">
-        <div className="h-8 bg-zinc-900 rounded w-1/2"></div>
-        <div className="grid grid-cols-3 gap-3">
-          {[1, 2, 3].map(i => <div key={i} className="h-16 bg-zinc-900 rounded-xl"></div>)}
-        </div>
-        <div className="h-56 bg-zinc-900 rounded-xl"></div>
-      </div>
-    );
-  }
-
-  const weights = data.weights;
-  const goalWeight = data.profile.goalWeight;
-
-  // TDEE Calculation
+  // TDEE Calculation - must be before any early returns
   const tdeeTracking = useMemo(() => {
+    if (!data.profile) {
+      return {
+        daysElapsed: 0,
+        calculatedTdee: null,
+        tdeeConfidence: null,
+        daysUntilTdee: 21,
+        weightsNeeded: 10,
+        weeklyTrend: null,
+      };
+    }
+
     const startDate = new Date(data.profile.startDate);
     const today = new Date();
     const daysElapsed = differenceInDays(today, startDate);
@@ -172,6 +161,28 @@ export default function WeightPage() {
       weeklyTrend,
     };
   }, [data.profile, data.weights, data.checklist, data.extraCalories, data.dayTypes, data.daySnapshots]);
+
+  const handleSubmit = () => {
+    if (!newWeight) return;
+    addWeight(selectedDate, parseFloat(newWeight));
+    setNewWeight('');
+    setShowForm(false);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-4 lg:p-8 lg:max-w-3xl animate-pulse space-y-4">
+        <div className="h-8 bg-zinc-900 rounded w-1/2"></div>
+        <div className="grid grid-cols-3 gap-3">
+          {[1, 2, 3].map(i => <div key={i} className="h-16 bg-zinc-900 rounded-xl"></div>)}
+        </div>
+        <div className="h-56 bg-zinc-900 rounded-xl"></div>
+      </div>
+    );
+  }
+
+  const weights = data.weights;
+  const goalWeight = data.profile.goalWeight;
 
   // Use calculated TDEE if available, otherwise estimate based on typical deficit
   const estimatedTdee = tdeeTracking.calculatedTdee || 2200;
@@ -316,7 +327,7 @@ export default function WeightPage() {
           {/* Legend */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-zinc-500"></div>
+              <div className="w-2 h-2 rounded-full bg-white"></div>
               <span className="text-zinc-500">Aktuell</span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -385,14 +396,15 @@ export default function WeightPage() {
                   dot={false}
                   name="avg"
                 />
-                {/* Actual weight dots */}
+                {/* Actual weight dots - rendered last to be on top */}
                 <Line
                   type="monotone"
                   dataKey="weight"
-                  stroke="transparent"
-                  strokeWidth={0}
-                  dot={{ fill: '#71717a', r: 4, strokeWidth: 0 }}
-                  activeDot={{ fill: '#a1a1aa', r: 5 }}
+                  stroke="#ffffff"
+                  strokeWidth={1}
+                  strokeOpacity={0.3}
+                  dot={{ fill: '#ffffff', r: 4, strokeWidth: 0 }}
+                  activeDot={{ fill: '#ffffff', r: 6, stroke: '#ffffff', strokeWidth: 2 }}
                   name="weight"
                 />
               </LineChart>
