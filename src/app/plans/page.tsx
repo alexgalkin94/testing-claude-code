@@ -418,12 +418,22 @@ export default function PlansPage() {
                                       value={item.quantity.toString()}
                                       onChange={(v) => updateItem(meal.id, item.id, { quantity: parseFloat(v) || 0 })}
                                     />
-                                    <Input
-                                      label="Einheit"
-                                      value={item.unit}
-                                      onChange={(v) => updateItem(meal.id, item.id, { unit: v })}
-                                      placeholder="g, Stück..."
-                                    />
+                                    <div>
+                                      <label className="block text-xs text-zinc-500 mb-1">Einheit</label>
+                                      <select
+                                        value={item.unit}
+                                        onChange={(e) => updateItem(meal.id, item.id, { unit: e.target.value })}
+                                        className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm"
+                                      >
+                                        <option value="g">g</option>
+                                        <option value="ml">ml</option>
+                                        <option value="Stück">Stück</option>
+                                        <option value="Portion">Portion</option>
+                                        <option value="Scheiben">Scheiben</option>
+                                        <option value="EL">EL</option>
+                                        <option value="TL">TL</option>
+                                      </select>
+                                    </div>
                                   </div>
                                 </div>
 
@@ -490,11 +500,22 @@ export default function PlansPage() {
                                               value={alt.quantity.toString()}
                                               onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { quantity: parseFloat(v) || 0 })}
                                             />
-                                            <Input
-                                              label="Einheit"
-                                              value={alt.unit}
-                                              onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { unit: v })}
-                                            />
+                                            <div>
+                                              <label className="block text-xs text-zinc-500 mb-1">Einheit</label>
+                                              <select
+                                                value={alt.unit}
+                                                onChange={(e) => updateAlternative(meal.id, item.id, alt.id, { unit: e.target.value })}
+                                                className="w-full bg-zinc-800 border border-zinc-700 rounded px-1 py-1.5 text-xs"
+                                              >
+                                                <option value="g">g</option>
+                                                <option value="ml">ml</option>
+                                                <option value="Stück">Stück</option>
+                                                <option value="Portion">Portion</option>
+                                                <option value="Scheiben">Scheiben</option>
+                                                <option value="EL">EL</option>
+                                                <option value="TL">TL</option>
+                                              </select>
+                                            </div>
                                             <Input
                                               label="kcal"
                                               type="number"
