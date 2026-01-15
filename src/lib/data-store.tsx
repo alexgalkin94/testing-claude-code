@@ -61,7 +61,7 @@ export interface AppData {
   lastSync?: string;
 }
 
-const CURRENT_MIGRATION_VERSION = 3;
+const CURRENT_MIGRATION_VERSION = 4;
 
 const DEFAULT_DATA: AppData = {
   profile: {
@@ -198,7 +198,7 @@ function migrateData(data: Partial<AppData>): AppData {
     }
   }
 
-  // REPAIR MIGRATION (v3): Create snapshots for ALL historical days with checklist data
+  // REPAIR MIGRATION (v3): Create/fix snapshots for ALL historical days with checklist data
   // This repairs data lost due to blob caching issues
   if (data.checklist && Object.keys(data.checklist).length > 0) {
     let repairedCount = 0;
@@ -206,9 +206,6 @@ function migrateData(data: Partial<AppData>): AppData {
     for (const date of Object.keys(data.checklist)) {
       // Skip today
       if (date === today) continue;
-
-      // Skip if snapshot already exists
-      if (migrated.daySnapshots[date]) continue;
 
       // Determine which plan was used (from dayTypes or dayPlanIds)
       const dayType = data.dayTypes?.[date];
@@ -221,24 +218,50 @@ function migrateData(data: Partial<AppData>): AppData {
         plan = DEFAULT_PLAN_A;
       }
 
-      // Create snapshot with DEFAULT_PLAN data (the original plan structure)
-      migrated.daySnapshots[date] = {
-        planId: plan.id,
-        planName: plan.name,
-        meals: JSON.parse(JSON.stringify(plan.meals)),
-        overrides: [],
-      };
+      // Check if existing snapshot has corrupted data
+      const existingSnapshot = migrated.daySnapshots[date];
+      let needsRepair = !existingSnapshot;
 
-      // Also ensure dayPlanIds is set
-      if (!migrated.dayPlanIds[date]) {
-        migrated.dayPlanIds[date] = plan.id;
+      if (existingSnapshot && !needsRepair) {
+        // Check if any items have suspiciously low calorie values (corruption indicator)
+        for (const meal of existingSnapshot.meals) {
+          for (const item of meal.items) {
+            // Most food items should have meaningful caloriesPer values
+            // Exception: oils/supplements that are measured in small portions
+            const isLowCalItem = item.name.toLowerCase().includes('omega') ||
+                                  item.name.toLowerCase().includes('supplement');
+            if (item.caloriesPer !== undefined && item.caloriesPer < 10 && !isLowCalItem) {
+              needsRepair = true;
+              break;
+            }
+          }
+          if (needsRepair) break;
+        }
       }
 
-      repairedCount++;
+      if (needsRepair) {
+        // Preserve existing overrides if any
+        const existingOverrides = existingSnapshot?.overrides || [];
+
+        // Replace snapshot with DEFAULT_PLAN data (correct nutritional values)
+        migrated.daySnapshots[date] = {
+          planId: plan.id,
+          planName: plan.name,
+          meals: JSON.parse(JSON.stringify(plan.meals)),
+          overrides: existingOverrides,
+        };
+
+        // Also ensure dayPlanIds is set
+        if (!migrated.dayPlanIds[date]) {
+          migrated.dayPlanIds[date] = plan.id;
+        }
+
+        repairedCount++;
+      }
     }
 
     if (repairedCount > 0) {
-      console.log(`Repaired ${repairedCount} days with missing snapshots`);
+      console.log(`Repaired ${repairedCount} days with missing/corrupted snapshots`);
     }
   }
 
