@@ -21,6 +21,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
@@ -202,6 +203,7 @@ export default function PlanEditorPage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [deleteMealDialog, setDeleteMealDialog] = useState<{ open: boolean; mealId: string | null; mealName: string }>({ open: false, mealId: null, mealName: '' });
+  const [mealsParent] = useAutoAnimate();
   const initializedRef = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -603,7 +605,7 @@ export default function PlanEditorPage() {
       {/* Meals */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <SortableContext items={editingPlan.meals.map(m => m.id)} strategy={verticalListSortingStrategy}>
-      <div className="space-y-4">
+      <div ref={mealsParent} className="space-y-4">
         {editingPlan.meals.map((meal) => {
           const mealTotals = getMealTotals(meal);
           const isExpanded = expandedMeals.has(meal.id);
