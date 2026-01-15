@@ -8,7 +8,6 @@ import {
   DEFAULT_MEAL_PLANS,
   DEFAULT_PLAN_A,
   DEFAULT_PLAN_B,
-  getPlanTotals,
 } from './mealPlan';
 
 // All app data in one place
@@ -62,7 +61,7 @@ export interface AppData {
   lastSync?: string;
 }
 
-const CURRENT_MIGRATION_VERSION = 1;
+const CURRENT_MIGRATION_VERSION = 2;
 
 const DEFAULT_DATA: AppData = {
   profile: {
@@ -149,17 +148,16 @@ function migrateData(data: Partial<AppData>): AppData {
       // Skip today - it should use current editable plans
       if (date === today) continue;
 
-      // Map old day type to new plan ID
-      const planId = dayType === 'A' ? 'default-plan-a' : 'default-plan-b';
+      // Map old day type to new plan ID (use actual plan IDs)
+      const plan = dayType === 'A' ? DEFAULT_PLAN_A : DEFAULT_PLAN_B;
 
       // Set the day plan ID if not already set
       if (!migrated.dayPlanIds[date]) {
-        migrated.dayPlanIds[date] = planId;
+        migrated.dayPlanIds[date] = plan.id;
       }
 
       // Create snapshot for historical days (preserves the exact plan data)
       if (!migrated.daySnapshots[date]) {
-        const plan = dayType === 'A' ? DEFAULT_PLAN_A : DEFAULT_PLAN_B;
         migrated.daySnapshots[date] = {
           planId: plan.id,
           planName: plan.name,
@@ -170,6 +168,34 @@ function migrateData(data: Partial<AppData>): AppData {
     }
 
     console.log(`Migrated ${Object.keys(data.dayTypes).length} days`);
+  }
+
+  // Always migrate old plan IDs to new ones (runs every time, not just during migration)
+  if (migrated.mealPlans['default-plan-a']) {
+    migrated.mealPlans[DEFAULT_PLAN_A.id] = { ...migrated.mealPlans['default-plan-a'], id: DEFAULT_PLAN_A.id };
+    delete migrated.mealPlans['default-plan-a'];
+  }
+  if (migrated.mealPlans['default-plan-b']) {
+    migrated.mealPlans[DEFAULT_PLAN_B.id] = { ...migrated.mealPlans['default-plan-b'], id: DEFAULT_PLAN_B.id };
+    delete migrated.mealPlans['default-plan-b'];
+  }
+
+  // Always migrate dayPlanIds from old IDs to new IDs
+  for (const [date, planId] of Object.entries(migrated.dayPlanIds)) {
+    if (planId === 'default-plan-a') {
+      migrated.dayPlanIds[date] = DEFAULT_PLAN_A.id;
+    } else if (planId === 'default-plan-b') {
+      migrated.dayPlanIds[date] = DEFAULT_PLAN_B.id;
+    }
+  }
+
+  // Also migrate daySnapshots with old plan IDs
+  for (const [date, snapshot] of Object.entries(migrated.daySnapshots)) {
+    if (snapshot.planId === 'default-plan-a') {
+      migrated.daySnapshots[date] = { ...snapshot, planId: DEFAULT_PLAN_A.id };
+    } else if (snapshot.planId === 'default-plan-b') {
+      migrated.daySnapshots[date] = { ...snapshot, planId: DEFAULT_PLAN_B.id };
+    }
   }
 
   // Set migration version
@@ -428,7 +454,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Also update legacy dayTypes for backwards compatibility
       dayTypes: {
         ...prev.dayTypes,
-        [date]: planId === 'default-plan-a' ? 'A' : 'B',
+        [date]: planId === DEFAULT_PLAN_A.id ? 'A' : 'B',
       },
     }));
   }, [updateData]);
@@ -442,10 +468,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // Fall back to legacy dayTypes mapping
     const legacyType = data.dayTypes?.[date];
     if (legacyType) {
-      return legacyType === 'A' ? 'default-plan-a' : 'default-plan-b';
+      return legacyType === 'A' ? DEFAULT_PLAN_A.id : DEFAULT_PLAN_B.id;
     }
     // Default to plan A
-    return 'default-plan-a';
+    return DEFAULT_PLAN_A.id;
   }, [data.dayPlanIds, data.dayTypes]);
 
   // Get the effective plan for a day (uses snapshot if available, else current plan)

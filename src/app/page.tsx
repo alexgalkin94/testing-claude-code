@@ -696,21 +696,15 @@ export default function TodayPage() {
           <div className="hidden lg:block">
             <Card className="p-4">
               <p className="text-sm text-zinc-400 mb-3">Ernährungsplan</p>
-              <div className="flex flex-col gap-2">
+              <select
+                value={selectedPlanId}
+                onChange={(e) => handlePlanChange(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-zinc-600"
+              >
                 {Object.values(data.mealPlans).map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => handlePlanChange(p.id)}
-                    className={`py-2.5 px-3 rounded-lg text-sm font-medium border transition-all text-left ${
-                      selectedPlanId === p.id
-                        ? 'bg-white text-black border-white'
-                        : 'bg-transparent text-zinc-400 border-zinc-700 hover:border-zinc-600'
-                    }`}
-                  >
-                    {p.name}
-                  </button>
+                  <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
-              </div>
+              </select>
             </Card>
           </div>
 
@@ -778,20 +772,16 @@ export default function TodayPage() {
         {/* Right Column - Meals */}
         <div className="lg:col-span-8">
           {/* Plan Toggle - Mobile */}
-          <div className="flex gap-2 mb-4 lg:hidden overflow-x-auto pb-1">
-            {Object.values(data.mealPlans).map((p) => (
-              <button
-                key={p.id}
-                onClick={() => handlePlanChange(p.id)}
-                className={`flex-shrink-0 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-                  selectedPlanId === p.id
-                    ? 'bg-white text-black'
-                    : 'bg-zinc-900/50 text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                {p.name}
-              </button>
-            ))}
+          <div className="mb-4 lg:hidden">
+            <select
+              value={selectedPlanId}
+              onChange={(e) => handlePlanChange(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-zinc-600"
+            >
+              {Object.values(data.mealPlans).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Macros Summary - Mobile - Elegant design */}
