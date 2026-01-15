@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Pencil, Trash2, ChevronLeft, ChevronDown, ChevronUp, GripVertical, X, Check, Sunrise, Sun, Sunset, Cookie } from 'lucide-react';
 import {
@@ -15,6 +15,7 @@ import {
   useDroppable,
   useDraggable,
 } from '@dnd-kit/core';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
@@ -84,6 +85,12 @@ function DroppableMeal({ id, children, isOver }: { id: string; children: React.R
   );
 }
 
+// Animated list wrapper
+function AnimatedList({ children, className }: { children: React.ReactNode; className?: string }) {
+  const [parent] = useAutoAnimate();
+  return <div ref={parent} className={className}>{children}</div>;
+}
+
 export default function PlansPage() {
   const router = useRouter();
   const { data, createPlan, updatePlan, deletePlan } = useData();
@@ -93,6 +100,10 @@ export default function PlansPage() {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeMealId, setActiveMealId] = useState<string | null>(null);
+
+  // Auto-animate for smooth list animations
+  const [mealsParent] = useAutoAnimate();
+  const [plansParent] = useAutoAnimate();
 
   // Sensors for both mouse/touch with activation constraints
   const sensors = useSensors(
@@ -152,10 +163,8 @@ export default function PlansPage() {
       updatePlan(editingPlan);
     } else {
       createPlan(editingPlan);
+      setEditingPlanId(editingPlan.id);
     }
-
-    setEditingPlanId(null);
-    setEditingPlan(null);
   };
 
   const handleCancelEdit = () => {
@@ -403,7 +412,7 @@ export default function PlansPage() {
 
         {/* Meals */}
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="space-y-4">
+        <div ref={mealsParent} className="space-y-4">
           {editingPlan.meals.map((meal) => {
             const mealTotals = getMealTotals(meal);
             const isExpanded = expandedMeals.has(meal.id);
@@ -477,7 +486,7 @@ export default function PlansPage() {
                     </div>
 
                     {/* Items List */}
-                    <div className="p-4 space-y-3">
+                    <AnimatedList className="p-4 space-y-3">
                       {meal.items.map((item) => {
                         const itemTotals = getItemTotals(item);
                         const isItemExpanded = expandedItems.has(item.id);
@@ -774,7 +783,7 @@ export default function PlansPage() {
                       >
                         <Plus size={14} /> Item hinzufügen
                       </button>
-                    </div>
+                    </AnimatedList>
                   </div>
                 )}
               </Card>
@@ -825,7 +834,7 @@ export default function PlansPage() {
         </Button>
       </div>
 
-      <div className="space-y-3">
+      <div ref={plansParent} className="space-y-3">
         {plans.map((plan) => {
           const totals = getPlanTotals(plan);
           const mealsCount = plan.meals.length;
