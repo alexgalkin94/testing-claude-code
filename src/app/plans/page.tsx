@@ -123,41 +123,85 @@ function AnimatedList({ children, className }: { children: React.ReactNode; clas
 // Export formats
 type ExportFormat = 'json' | 'table' | 'text';
 
+function calcItemTotals(item: MealItem) {
+  const divisor = (item.unit === 'g' || item.unit === 'ml') ? 100 : 1;
+  return {
+    kcal: Math.round(item.caloriesPer * item.quantity / divisor),
+    protein: Math.round(item.proteinPer * item.quantity / divisor * 10) / 10,
+    carbs: Math.round(item.carbsPer * item.quantity / divisor * 10) / 10,
+    fat: Math.round(item.fatPer * item.quantity / divisor * 10) / 10,
+  };
+}
+
 function exportPlan(plan: MealPlan, format: ExportFormat): string {
+  // Calculate totals
+  let totalKcal = 0, totalP = 0, totalC = 0, totalF = 0;
+  for (const meal of plan.meals) {
+    for (const item of meal.items) {
+      const t = calcItemTotals(item);
+      totalKcal += t.kcal;
+      totalP += t.protein;
+      totalC += t.carbs;
+      totalF += t.fat;
+    }
+  }
+
   if (format === 'json') {
-    return JSON.stringify(plan, null, 2);
+    // Clean export without internal fields
+    const cleanPlan = {
+      name: plan.name,
+      totals: {
+        kcal: totalKcal,
+        protein: Math.round(totalP * 10) / 10,
+        carbs: Math.round(totalC * 10) / 10,
+        fat: Math.round(totalF * 10) / 10,
+      },
+      meals: plan.meals.map(meal => ({
+        name: meal.name,
+        time: meal.time,
+        items: meal.items.map(item => {
+          const t = calcItemTotals(item);
+          return {
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            kcal: t.kcal,
+            protein: t.protein,
+            carbs: t.carbs,
+            fat: t.fat,
+          };
+        }),
+      })),
+    };
+    return JSON.stringify(cleanPlan, null, 2);
   }
 
   if (format === 'table') {
     let output = `# ${plan.name}\n\n`;
-    output += `| Mahlzeit | Item | Menge | kcal | Protein | Carbs | Fett |\n`;
-    output += `|----------|------|-------|------|---------|-------|------|\n`;
+    output += `**Gesamt:** ${totalKcal} kcal | ${Math.round(totalP)}g Protein | ${Math.round(totalC)}g Carbs | ${Math.round(totalF)}g Fett\n\n`;
+    output += `| Mahlzeit | Item | kcal | Protein | Carbs | Fett |\n`;
+    output += `|----------|------|------|---------|-------|------|\n`;
     for (const meal of plan.meals) {
       for (const item of meal.items) {
-        const divisor = (item.unit === 'g' || item.unit === 'ml') ? 100 : 1;
-        const kcal = Math.round(item.caloriesPer * item.quantity / divisor);
-        const p = Math.round(item.proteinPer * item.quantity / divisor * 10) / 10;
-        const c = Math.round(item.carbsPer * item.quantity / divisor * 10) / 10;
-        const f = Math.round(item.fatPer * item.quantity / divisor * 10) / 10;
-        output += `| ${meal.name} | ${item.quantity}${item.unit} ${item.name} | ${item.quantity}${item.unit} | ${kcal} | ${p}g | ${c}g | ${f}g |\n`;
+        const t = calcItemTotals(item);
+        output += `| ${meal.name} | ${item.quantity}${item.unit} ${item.name} | ${t.kcal} | ${t.protein}g | ${t.carbs}g | ${t.fat}g |\n`;
       }
     }
     return output;
   }
 
   // text format
-  let output = `${plan.name}\n${'='.repeat(plan.name.length)}\n\n`;
+  let output = `${plan.name}\n${'='.repeat(plan.name.length)}\n`;
+  output += `Gesamt: ${totalKcal} kcal, ${Math.round(totalP)}g P, ${Math.round(totalC)}g C, ${Math.round(totalF)}g F\n\n`;
   for (const meal of plan.meals) {
-    output += `${meal.name} (${meal.time}):\n`;
+    output += `${meal.name}${meal.time ? ` (${meal.time})` : ''}:\n`;
     for (const item of meal.items) {
-      const divisor = (item.unit === 'g' || item.unit === 'ml') ? 100 : 1;
-      const kcal = Math.round(item.caloriesPer * item.quantity / divisor);
-      const p = Math.round(item.proteinPer * item.quantity / divisor * 10) / 10;
-      output += `  - ${item.quantity}${item.unit} ${item.name} (${kcal} kcal, ${p}g P)\n`;
+      const t = calcItemTotals(item);
+      output += `  - ${item.quantity}${item.unit} ${item.name} (${t.kcal} kcal, ${t.protein}g P)\n`;
     }
     output += '\n';
   }
-  return output;
+  return output.trim();
 }
 
 export default function PlansPage() {
