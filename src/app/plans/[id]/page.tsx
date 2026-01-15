@@ -660,7 +660,7 @@ export default function PlanEditorPage() {
                                 <span className="text-sm font-medium truncate">
                                   {item.alternatives?.length
                                     ? (item.groupName || 'Optionen')
-                                    : `${item.quantity}${item.unit === 'g' || item.unit === 'ml' ? `${item.unit} ` : '× '}{item.name}`
+                                    : `${item.quantity}${item.unit === 'g' || item.unit === 'ml' ? `${item.unit} ` : '× '}${item.name}`
                                   }
                                 </span>
                                 {item.alternatives?.length ? (
@@ -955,7 +955,7 @@ export default function PlanEditorPage() {
             <span className="text-sm font-medium">
               {activeItem.alternatives?.length
                 ? (activeItem.groupName || 'Optionen')
-                : `${activeItem.quantity}${activeItem.unit === 'g' || activeItem.unit === 'ml' ? `${activeItem.unit} ` : '× '}{activeItem.name}`
+                : `${activeItem.quantity}${activeItem.unit === 'g' || activeItem.unit === 'ml' ? `${activeItem.unit} ` : '× '}${activeItem.name}`
               }
             </span>
           </div>

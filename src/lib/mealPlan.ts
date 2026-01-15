@@ -1,3 +1,5 @@
+import { nanoid } from 'nanoid';
+
 // Meal Plan with per-unit values and quantity multipliers
 
 export interface MealItem {
@@ -251,7 +253,7 @@ const PLAN_A_MEALS: Meal[] = [
 ];
 
 export const DEFAULT_PLAN_A: MealPlan = {
-  id: 'default-plan-a',
+  id: 'NnGeODUx2WC7DsvTsbodP',
   name: 'Trainingstag',
   meals: PLAN_A_MEALS,
 };
@@ -403,15 +405,15 @@ const PLAN_B_MEALS: Meal[] = [
 ];
 
 export const DEFAULT_PLAN_B: MealPlan = {
-  id: 'default-plan-b',
+  id: 'kuziSJKV4b8zMpAtSTBo',
   name: 'Ruhetag',
   meals: PLAN_B_MEALS,
 };
 
 // All default plans for initialization
 export const DEFAULT_MEAL_PLANS: { [id: string]: MealPlan } = {
-  'default-plan-a': DEFAULT_PLAN_A,
-  'default-plan-b': DEFAULT_PLAN_B,
+  [DEFAULT_PLAN_A.id]: DEFAULT_PLAN_A,
+  [DEFAULT_PLAN_B.id]: DEFAULT_PLAN_B,
 };
 
 // Legacy compatibility - calculate totals for old DayPlan format
@@ -442,19 +444,19 @@ export const DAY_B: DayPlan = {
   totals: calculateTotals(PLAN_B_MEALS),
 };
 
-// Generate unique ID for new plans
+// Generate unique ID for new plans (21 chars, URL-safe, unguessable)
 export function generatePlanId(): string {
-  return `plan-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return nanoid();
 }
 
 // Generate unique ID for new items
 export function generateItemId(): string {
-  return `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return nanoid();
 }
 
 // Generate unique ID for new meals
 export function generateMealId(): string {
-  return `meal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return nanoid();
 }
 
 // Create empty meal plan template
