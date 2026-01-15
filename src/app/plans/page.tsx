@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import { useData } from '@/lib/data-store';
 import { getPlanTotals } from '@/lib/mealPlan';
 
@@ -12,6 +14,9 @@ export default function PlansPage() {
   const router = useRouter();
   const { data, deletePlan } = useData();
   const [plansParent] = useAutoAnimate();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState<string | null>(null);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
 
   const plans = Object.values(data.mealPlans);
 
@@ -25,11 +30,17 @@ export default function PlansPage() {
 
   const handleDeletePlan = (planId: string) => {
     if (plans.length <= 1) {
-      alert('Du musst mindestens einen Plan behalten.');
+      setErrorDialogOpen(true);
       return;
     }
-    if (confirm('Willst du diesen Plan wirklich löschen?')) {
-      deletePlan(planId);
+    setPlanToDelete(planId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (planToDelete) {
+      deletePlan(planToDelete);
+      setPlanToDelete(null);
     }
   };
 
@@ -93,6 +104,26 @@ export default function PlansPage() {
           </Button>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Plan löschen?"
+        description="Willst du diesen Plan wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+        confirmLabel="Löschen"
+        cancelLabel="Abbrechen"
+        onConfirm={confirmDelete}
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        open={errorDialogOpen}
+        onOpenChange={setErrorDialogOpen}
+        title="Nicht möglich"
+        description="Du musst mindestens einen Plan behalten."
+        confirmLabel="OK"
+        onConfirm={() => {}}
+      />
     </div>
   );
 }

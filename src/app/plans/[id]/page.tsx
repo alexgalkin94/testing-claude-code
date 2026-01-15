@@ -24,6 +24,7 @@ import { CSS } from '@dnd-kit/utilities';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import { useData } from '@/lib/data-store';
 import {
   MealPlan,
@@ -200,6 +201,7 @@ export default function PlanEditorPage() {
   const [activeType, setActiveType] = useState<'item' | 'meal' | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteMealDialog, setDeleteMealDialog] = useState<{ open: boolean; mealId: string | null; mealName: string }>({ open: false, mealId: null, mealName: '' });
   const initializedRef = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -636,9 +638,7 @@ export default function PlanEditorPage() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (confirm(`"${meal.name}" wirklich löschen?`)) {
-                      deleteMeal(meal.id);
-                    }
+                    setDeleteMealDialog({ open: true, mealId: meal.id, mealName: meal.name });
                   }}
                   className="p-2 text-zinc-600 hover:text-red-500"
                 >
@@ -1007,6 +1007,21 @@ export default function PlanEditorPage() {
         ) : null}
       </DragOverlay>
       </DndContext>
+
+      <ConfirmDialog
+        open={deleteMealDialog.open}
+        onOpenChange={(open) => setDeleteMealDialog(prev => ({ ...prev, open }))}
+        title="Mahlzeit löschen?"
+        description={`"${deleteMealDialog.mealName}" wirklich löschen?`}
+        confirmLabel="Löschen"
+        cancelLabel="Abbrechen"
+        onConfirm={() => {
+          if (deleteMealDialog.mealId) {
+            deleteMeal(deleteMealDialog.mealId);
+          }
+        }}
+        variant="danger"
+      />
     </div>
   );
 }
