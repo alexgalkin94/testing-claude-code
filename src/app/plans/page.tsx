@@ -3,6 +3,18 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Pencil, Trash2, ChevronLeft, ChevronDown, ChevronUp, GripVertical, X, Check, Sunrise, Sun, Sunset, Cookie } from 'lucide-react';
+import {
+  DndContext,
+  DragOverlay,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  TouchSensor,
+  DragStartEvent,
+  DragEndEvent,
+  useDroppable,
+  useDraggable,
+} from '@dnd-kit/core';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
@@ -31,6 +43,47 @@ const MealIcon = ({ icon, size = 16 }: { icon: string; size?: number }) => {
   }
 };
 
+// Draggable item wrapper
+function DraggableItem({ id, mealId, children }: { id: string; mealId: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id,
+    data: { mealId },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`relative ${isDragging ? 'opacity-50' : ''}`}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute left-0 top-0 bottom-0 w-8 flex items-center justify-center cursor-grab active:cursor-grabbing text-zinc-600 hover:text-zinc-400 touch-none"
+      >
+        <GripVertical size={14} />
+      </div>
+      <div className="pl-8">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Droppable meal zone
+function DroppableMeal({ id, children, isOver }: { id: string; children: React.ReactNode; isOver?: boolean }) {
+  const { setNodeRef, isOver: dropping } = useDroppable({ id });
+  const highlight = isOver !== undefined ? isOver : dropping;
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`transition-colors rounded-lg ${highlight ? 'ring-2 ring-amber-500/50' : ''}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function PlansPage() {
   const router = useRouter();
   const { data, createPlan, updatePlan, deletePlan } = useData();
@@ -38,6 +91,44 @@ export default function PlansPage() {
   const [editingPlan, setEditingPlan] = useState<MealPlan | null>(null);
   const [expandedMeals, setExpandedMeals] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeMealId, setActiveMealId] = useState<string | null>(null);
+
+  // Sensors for both mouse/touch with activation constraints
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 5 },
+    })
+  );
+
+  // Find the currently dragged item for the overlay
+  const activeItem = activeId && activeMealId && editingPlan
+    ? editingPlan.meals.find(m => m.id === activeMealId)?.items.find(i => i.id === activeId)
+    : null;
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    setActiveId(active.id as string);
+    setActiveMealId(active.data.current?.mealId as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.data.current?.mealId !== over.id) {
+      moveItem(
+        active.data.current?.mealId as string,
+        over.id as string,
+        active.id as string
+      );
+    }
+
+    setActiveId(null);
+    setActiveMealId(null);
+  };
 
   const plans = Object.values(data.mealPlans);
 
@@ -156,6 +247,26 @@ export default function PlansPage() {
           ? { ...m, items: m.items.filter(i => i.id !== itemId) }
           : m
       ),
+    });
+  };
+
+  const moveItem = (fromMealId: string, toMealId: string, itemId: string) => {
+    if (!editingPlan || fromMealId === toMealId) return;
+    const fromMeal = editingPlan.meals.find(m => m.id === fromMealId);
+    const itemToMove = fromMeal?.items.find(i => i.id === itemId);
+    if (!itemToMove) return;
+
+    setEditingPlan({
+      ...editingPlan,
+      meals: editingPlan.meals.map(m => {
+        if (m.id === fromMealId) {
+          return { ...m, items: m.items.filter(i => i.id !== itemId) };
+        }
+        if (m.id === toMealId) {
+          return { ...m, items: [...m.items, itemToMove] };
+        }
+        return m;
+      }),
     });
   };
 
@@ -291,13 +402,15 @@ export default function PlansPage() {
         </Card>
 
         {/* Meals */}
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="space-y-4">
           {editingPlan.meals.map((meal) => {
             const mealTotals = getMealTotals(meal);
             const isExpanded = expandedMeals.has(meal.id);
 
             return (
-              <Card key={meal.id} className="p-0 overflow-hidden">
+              <DroppableMeal key={meal.id} id={meal.id}>
+              <Card className="p-0 overflow-hidden">
                 {/* Meal Header */}
                 <div
                   className="flex items-center gap-3 p-4 cursor-pointer hover:bg-zinc-800/50"
@@ -370,8 +483,8 @@ export default function PlansPage() {
                         const isItemExpanded = expandedItems.has(item.id);
 
                         return (
+                          <DraggableItem key={item.id} id={item.id} mealId={meal.id}>
                           <div
-                            key={item.id}
                             className="bg-zinc-800/50 rounded-lg overflow-hidden"
                           >
                             {/* Item Header */}
@@ -650,6 +763,7 @@ export default function PlansPage() {
                               </div>
                             )}
                           </div>
+                          </DraggableItem>
                         );
                       })}
 
@@ -664,6 +778,7 @@ export default function PlansPage() {
                   </div>
                 )}
               </Card>
+              </DroppableMeal>
             );
           })}
 
@@ -675,6 +790,24 @@ export default function PlansPage() {
             <Plus size={16} /> Mahlzeit hinzufügen
           </button>
         </div>
+
+        {/* Drag Overlay */}
+        <DragOverlay>
+          {activeItem ? (
+            <div className="bg-zinc-800 rounded-lg p-3 shadow-xl border border-zinc-600 opacity-90">
+              <div className="flex items-center gap-2">
+                <GripVertical size={14} className="text-zinc-400" />
+                <span className="text-sm font-medium">
+                  {activeItem.alternatives?.length
+                    ? (activeItem.groupName || 'Optionen')
+                    : `${activeItem.quantity}${activeItem.unit === 'g' || activeItem.unit === 'ml' ? activeItem.unit : '× '} ${activeItem.name}`
+                  }
+                </span>
+              </div>
+            </div>
+          ) : null}
+        </DragOverlay>
+        </DndContext>
       </div>
     );
   }
