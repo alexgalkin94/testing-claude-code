@@ -316,7 +316,6 @@ export default function PlanEditorPage() {
                   : m
               ),
             });
-            setHasChanges(true);
           }
         }
       } else {
