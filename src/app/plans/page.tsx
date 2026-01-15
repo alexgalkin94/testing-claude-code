@@ -18,6 +18,7 @@ import {
   getPlanTotals,
   getMealTotals,
   getItemTotals,
+  getEffectiveItem,
 } from '@/lib/mealPlan';
 
 const MealIcon = ({ icon, size = 16 }: { icon: string; size?: number }) => {
@@ -153,6 +154,69 @@ export default function PlansPage() {
       meals: editingPlan.meals.map(m =>
         m.id === mealId
           ? { ...m, items: m.items.filter(i => i.id !== itemId) }
+          : m
+      ),
+    });
+  };
+
+  const addAlternative = (mealId: string, itemId: string) => {
+    if (!editingPlan) return;
+    const newAlt = createEmptyItem('Alternative');
+    setEditingPlan({
+      ...editingPlan,
+      meals: editingPlan.meals.map(m =>
+        m.id === mealId
+          ? {
+              ...m,
+              items: m.items.map(i =>
+                i.id === itemId
+                  ? { ...i, alternatives: [...(i.alternatives || []), newAlt] }
+                  : i
+              ),
+            }
+          : m
+      ),
+    });
+  };
+
+  const updateAlternative = (mealId: string, itemId: string, altId: string, updates: Partial<MealItem>) => {
+    if (!editingPlan) return;
+    setEditingPlan({
+      ...editingPlan,
+      meals: editingPlan.meals.map(m =>
+        m.id === mealId
+          ? {
+              ...m,
+              items: m.items.map(i =>
+                i.id === itemId
+                  ? {
+                      ...i,
+                      alternatives: i.alternatives?.map(a =>
+                        a.id === altId ? { ...a, ...updates } : a
+                      ),
+                    }
+                  : i
+              ),
+            }
+          : m
+      ),
+    });
+  };
+
+  const deleteAlternative = (mealId: string, itemId: string, altId: string) => {
+    if (!editingPlan) return;
+    setEditingPlan({
+      ...editingPlan,
+      meals: editingPlan.meals.map(m =>
+        m.id === mealId
+          ? {
+              ...m,
+              items: m.items.map(i =>
+                i.id === itemId
+                  ? { ...i, alternatives: i.alternatives?.filter(a => a.id !== altId) }
+                  : i
+              ),
+            }
           : m
       ),
     });
@@ -395,15 +459,81 @@ export default function PlansPage() {
                                   Gesamt: {itemTotals.calories} kcal · {itemTotals.protein}g P · {itemTotals.carbs}g C · {itemTotals.fat}g F
                                 </div>
 
-                                {/* Options */}
-                                <Input
-                                  label="Alternativen (kommagetrennt)"
-                                  value={item.options?.join(', ') || ''}
-                                  onChange={(v) => updateItem(meal.id, item.id, {
-                                    options: v ? v.split(',').map(s => s.trim()).filter(Boolean) : undefined
-                                  })}
-                                  placeholder="z.B. Toastbrötchen, Haferflocken"
-                                />
+                                {/* Alternatives */}
+                                {item.alternatives && item.alternatives.length > 0 && (
+                                  <div className="mt-3 space-y-2">
+                                    <p className="text-xs text-zinc-500 font-medium">Alternativen:</p>
+                                    {item.alternatives.map((alt) => {
+                                      const altTotals = getItemTotals(alt);
+                                      return (
+                                        <div key={alt.id} className="bg-zinc-900/50 rounded-lg p-3 space-y-2">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs text-amber-500/70">ODER</span>
+                                            <input
+                                              type="text"
+                                              value={alt.name}
+                                              onChange={(e) => updateAlternative(meal.id, item.id, alt.id, { name: e.target.value })}
+                                              className="flex-1 text-sm bg-transparent border-none outline-none"
+                                              placeholder="Name"
+                                            />
+                                            <button
+                                              onClick={() => deleteAlternative(meal.id, item.id, alt.id)}
+                                              className="p-1 text-zinc-600 hover:text-red-500"
+                                            >
+                                              <X size={12} />
+                                            </button>
+                                          </div>
+                                          <div className="grid grid-cols-6 gap-2">
+                                            <Input
+                                              label="Menge"
+                                              type="number"
+                                              value={alt.quantity.toString()}
+                                              onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { quantity: parseFloat(v) || 0 })}
+                                            />
+                                            <Input
+                                              label="Einheit"
+                                              value={alt.unit}
+                                              onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { unit: v })}
+                                            />
+                                            <Input
+                                              label="kcal"
+                                              type="number"
+                                              value={alt.caloriesPer.toString()}
+                                              onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { caloriesPer: parseFloat(v) || 0 })}
+                                            />
+                                            <Input
+                                              label="P"
+                                              type="number"
+                                              value={alt.proteinPer.toString()}
+                                              onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { proteinPer: parseFloat(v) || 0 })}
+                                            />
+                                            <Input
+                                              label="C"
+                                              type="number"
+                                              value={alt.carbsPer.toString()}
+                                              onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { carbsPer: parseFloat(v) || 0 })}
+                                            />
+                                            <Input
+                                              label="F"
+                                              type="number"
+                                              value={alt.fatPer.toString()}
+                                              onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { fatPer: parseFloat(v) || 0 })}
+                                            />
+                                          </div>
+                                          <p className="text-[10px] text-zinc-500">
+                                            = {altTotals.calories} kcal · {altTotals.protein}g P · {altTotals.carbs}g C · {altTotals.fat}g F
+                                          </p>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                <button
+                                  onClick={() => addAlternative(meal.id, item.id)}
+                                  className="w-full mt-2 py-1.5 px-3 rounded border border-dashed border-zinc-700 text-zinc-500 hover:border-amber-500/50 hover:text-amber-500/70 text-xs flex items-center justify-center gap-1"
+                                >
+                                  <Plus size={12} /> Alternative hinzufügen
+                                </button>
                               </div>
                             )}
                           </div>

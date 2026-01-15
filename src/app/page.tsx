@@ -13,6 +13,7 @@ import {
   getItemTotals,
   getMealTotals,
   getPlanTotals,
+  getEffectiveItem,
   ItemOverride,
 } from '@/lib/mealPlan';
 
@@ -100,16 +101,19 @@ export default function TodayPage() {
   const handleOverrideQuantity = (itemId: string) => {
     const qty = parseFloat(editingQuantity);
     if (!isNaN(qty) && qty >= 0) {
-      setDayOverride(selectedDateStr, itemId, qty);
+      setDayOverride(selectedDateStr, itemId, { quantity: qty });
     }
     setEditingItemId(null);
     setEditingQuantity('');
   };
 
-  // Get override quantity for an item
-  const getOverrideForItem = (itemId: string): number | undefined => {
-    const override = dayOverrides.find(o => o.itemId === itemId);
-    return override?.quantity;
+  // Get override for an item
+  const getOverrideForItem = (itemId: string): ItemOverride | undefined => {
+    return dayOverrides.find(o => o.itemId === itemId);
+  };
+
+  const handleSelectAlternative = (itemId: string, alternativeId: string | undefined) => {
+    setDayOverride(selectedDateStr, itemId, { alternativeId });
   };
 
   const toggleExpanded = (itemId: string) => {
@@ -186,7 +190,8 @@ export default function TodayPage() {
       meal.items.forEach(item => {
         if (checkedItems.has(item.id)) {
           const override = dayOverrides.find(o => o.itemId === item.id);
-          const totals = getItemTotals(item, override?.quantity);
+          const effectiveItem = getEffectiveItem(item, override?.alternativeId);
+          const totals = getItemTotals(effectiveItem, override?.quantity);
           result.calories += totals.calories;
           result.protein += totals.protein;
           result.carbs += totals.carbs;
@@ -841,30 +846,35 @@ export default function TodayPage() {
                   </div>
 
                   <div className="space-y-2">
-                    {meal.items.map(item => (
-                      <MealItemRow
-                        key={item.id}
-                        item={item}
-                        checked={checkedItems.has(item.id)}
-                        expanded={expandedItems.has(item.id)}
-                        onToggle={() => handleToggle(item.id)}
-                        onExpand={() => toggleExpanded(item.id)}
-                        overrideQuantity={getOverrideForItem(item.id)}
-                        onOverrideClick={() => {
-                          if (editingItemId === item.id) {
-                            setEditingItemId(null);
-                            setEditingQuantity('');
-                          } else {
-                            setEditingItemId(item.id);
-                            setEditingQuantity(getOverrideForItem(item.id)?.toString() || item.quantity.toString());
-                          }
-                        }}
-                        isEditing={editingItemId === item.id}
-                        editingValue={editingQuantity}
-                        onEditingChange={setEditingQuantity}
-                        onEditingSave={() => handleOverrideQuantity(item.id)}
-                      />
-                    ))}
+                    {meal.items.map(item => {
+                      const override = getOverrideForItem(item.id);
+                      return (
+                        <MealItemRow
+                          key={item.id}
+                          item={item}
+                          checked={checkedItems.has(item.id)}
+                          expanded={expandedItems.has(item.id)}
+                          onToggle={() => handleToggle(item.id)}
+                          onExpand={() => toggleExpanded(item.id)}
+                          override={override}
+                          onOverrideClick={() => {
+                            if (editingItemId === item.id) {
+                              setEditingItemId(null);
+                              setEditingQuantity('');
+                            } else {
+                              setEditingItemId(item.id);
+                              const effectiveItem = getEffectiveItem(item, override?.alternativeId);
+                              setEditingQuantity(override?.quantity?.toString() || effectiveItem.quantity.toString());
+                            }
+                          }}
+                          onSelectAlternative={(altId) => handleSelectAlternative(item.id, altId)}
+                          isEditing={editingItemId === item.id}
+                          editingValue={editingQuantity}
+                          onEditingChange={setEditingQuantity}
+                          onEditingSave={() => handleOverrideQuantity(item.id)}
+                        />
+                      );
+                    })}
                   </div>
                 </Card>
               );
@@ -918,8 +928,9 @@ function MealItemRow({
   expanded,
   onToggle,
   onExpand,
-  overrideQuantity,
+  override,
   onOverrideClick,
+  onSelectAlternative,
   isEditing,
   editingValue,
   onEditingChange,
@@ -930,17 +941,20 @@ function MealItemRow({
   expanded: boolean;
   onToggle: () => void;
   onExpand: () => void;
-  overrideQuantity?: number;
+  override?: ItemOverride;
   onOverrideClick?: () => void;
+  onSelectAlternative?: (alternativeId: string | undefined) => void;
   isEditing?: boolean;
   editingValue?: string;
   onEditingChange?: (value: string) => void;
   onEditingSave?: () => void;
 }) {
-  const hasOptions = item.options && item.options.length > 0;
-  const effectiveQuantity = overrideQuantity ?? item.quantity;
-  const totals = getItemTotals(item, effectiveQuantity);
-  const hasOverride = overrideQuantity !== undefined && overrideQuantity !== item.quantity;
+  const hasAlternatives = item.alternatives && item.alternatives.length > 0;
+  const effectiveItem = getEffectiveItem(item, override?.alternativeId);
+  const effectiveQuantity = override?.quantity ?? effectiveItem.quantity;
+  const totals = getItemTotals(effectiveItem, effectiveQuantity);
+  const hasQuantityOverride = override?.quantity !== undefined && override.quantity !== effectiveItem.quantity;
+  const hasAlternativeSelected = override?.alternativeId !== undefined;
 
   return (
     <div className={`rounded-lg transition-colors ${checked ? 'bg-emerald-500/5' : 'bg-zinc-800/50 hover:bg-zinc-800'}`}>
@@ -959,11 +973,12 @@ function MealItemRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className={`text-sm ${checked ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
-              {effectiveQuantity !== 1 && `${effectiveQuantity}${item.unit === 'g' || item.unit === 'ml' ? item.unit : '× '}`}
-              {item.name}
-              {hasOverride && <span className="text-orange-400 ml-1 text-xs">(angepasst)</span>}
+              {effectiveQuantity !== 1 && `${effectiveQuantity}${effectiveItem.unit === 'g' || effectiveItem.unit === 'ml' ? effectiveItem.unit : '× '}`}
+              {effectiveItem.name}
+              {hasQuantityOverride && <span className="text-orange-400 ml-1 text-xs">(angepasst)</span>}
+              {hasAlternativeSelected && <span className="text-amber-500/70 ml-1 text-xs">(Alternative)</span>}
             </span>
-            {hasOptions && (
+            {hasAlternatives && (
               <button onClick={onExpand} className="text-zinc-600 hover:text-zinc-400">
                 <ChevronDown size={14} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
               </button>
@@ -998,14 +1013,14 @@ function MealItemRow({
               value={editingValue}
               onChange={(e) => onEditingChange?.(e.target.value)}
               className="w-20 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm"
-              placeholder={item.quantity.toString()}
+              placeholder={effectiveItem.quantity.toString()}
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onEditingSave?.();
                 if (e.key === 'Escape') onOverrideClick?.();
               }}
             />
-            <span className="text-xs text-zinc-500">{item.unit}</span>
+            <span className="text-xs text-zinc-500">{effectiveItem.unit}</span>
             <button
               onClick={onEditingSave}
               className="bg-white text-black px-2 py-1 rounded text-xs font-medium"
@@ -1016,15 +1031,42 @@ function MealItemRow({
         </div>
       )}
 
-      {hasOptions && expanded && !isEditing && (
+      {/* Alternatives selection */}
+      {hasAlternatives && expanded && !isEditing && (
         <div className="px-3 pb-3">
           <div className="pl-8 space-y-1">
-            {item.options!.map((option, i) => (
-              <div key={i} className="text-xs text-zinc-500 flex items-center gap-2">
-                <ChevronRight size={10} />
-                {option}
-              </div>
-            ))}
+            <button
+              onClick={() => onSelectAlternative?.(undefined)}
+              className={`w-full text-left text-xs px-2 py-1.5 rounded flex items-center gap-2 transition-colors ${
+                !hasAlternativeSelected
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'text-zinc-400 hover:bg-zinc-700/50'
+              }`}
+            >
+              <div className={`w-3 h-3 rounded-full border ${!hasAlternativeSelected ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600'}`} />
+              {item.quantity}{item.unit === 'g' || item.unit === 'ml' ? item.unit : '× '} {item.name}
+            </button>
+            {item.alternatives!.map((alt) => {
+              const isSelected = override?.alternativeId === alt.id;
+              const altTotals = getItemTotals(alt);
+              return (
+                <button
+                  key={alt.id}
+                  onClick={() => onSelectAlternative?.(alt.id)}
+                  className={`w-full text-left text-xs px-2 py-1.5 rounded flex items-center gap-2 transition-colors ${
+                    isSelected
+                      ? 'bg-amber-500/20 text-amber-400'
+                      : 'text-zinc-400 hover:bg-zinc-700/50'
+                  }`}
+                >
+                  <div className={`w-3 h-3 rounded-full border ${isSelected ? 'bg-amber-500 border-amber-500' : 'border-zinc-600'}`} />
+                  <span className="flex-1">
+                    {alt.quantity}{alt.unit === 'g' || alt.unit === 'ml' ? alt.unit : '× '} {alt.name}
+                  </span>
+                  <span className="text-zinc-600">{altTotals.calories} kcal</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

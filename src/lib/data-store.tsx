@@ -113,7 +113,7 @@ interface DataContextType {
   getDayPlan: (date: string) => MealPlan | null;
   getDaySnapshot: (date: string) => DaySnapshot | null;
   // NEW: Day overrides
-  setDayOverride: (date: string, itemId: string, quantity: number) => void;
+  setDayOverride: (date: string, itemId: string, updates: { quantity?: number; alternativeId?: string }) => void;
   removeDayOverride: (date: string, itemId: string) => void;
   getDayOverrides: (date: string) => ItemOverride[];
   // NEW: Create snapshot for a day (called when tracking starts)
@@ -472,7 +472,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [data.daySnapshots]);
 
   // Set an override for a specific item on a specific day
-  const setDayOverride = useCallback((date: string, itemId: string, quantity: number) => {
+  const setDayOverride = useCallback((date: string, itemId: string, updates: { quantity?: number; alternativeId?: string }) => {
     updateData(prev => {
       const existingSnapshot = prev.daySnapshots[date];
       if (!existingSnapshot) {
@@ -485,7 +485,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           planId: plan.id,
           planName: plan.name,
           meals: JSON.parse(JSON.stringify(plan.meals)),
-          overrides: [{ itemId, quantity }],
+          overrides: [{ itemId, ...updates }],
         };
 
         return {
@@ -495,8 +495,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
 
       // Update existing snapshot's overrides
+      const existingOverride = existingSnapshot.overrides.find(o => o.itemId === itemId);
       const newOverrides = existingSnapshot.overrides.filter(o => o.itemId !== itemId);
-      newOverrides.push({ itemId, quantity });
+      newOverrides.push({ itemId, ...existingOverride, ...updates });
 
       return {
         ...prev,
