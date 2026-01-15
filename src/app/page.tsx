@@ -972,12 +972,22 @@ function MealItemRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className={`text-sm ${checked ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
-              {effectiveQuantity !== 1 && `${effectiveQuantity}${effectiveItem.unit === 'g' || effectiveItem.unit === 'ml' ? effectiveItem.unit : '× '}`}
-              {effectiveItem.name}
-              {hasQuantityOverride && <span className="text-orange-400 ml-1 text-xs">(angepasst)</span>}
-              {hasAlternativeSelected && <span className="text-amber-500/70 ml-1 text-xs">(Alternative)</span>}
-            </span>
+            {hasAlternatives ? (
+              <>
+                <span className={`text-sm ${checked ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
+                  {item.groupName || 'Optionen'}
+                </span>
+                <span className="text-xs text-zinc-500">
+                  → {effectiveQuantity !== 1 && `${effectiveQuantity}${effectiveItem.unit === 'g' || effectiveItem.unit === 'ml' ? effectiveItem.unit : '× '}`}{effectiveItem.name}
+                </span>
+              </>
+            ) : (
+              <span className={`text-sm ${checked ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
+                {effectiveQuantity !== 1 && `${effectiveQuantity}${effectiveItem.unit === 'g' || effectiveItem.unit === 'ml' ? effectiveItem.unit : '× '}`}
+                {effectiveItem.name}
+              </span>
+            )}
+            {hasQuantityOverride && <span className="text-orange-400 ml-1 text-xs">(angepasst)</span>}
             {hasAlternatives && (
               <button onClick={onExpand} className="text-zinc-600 hover:text-zinc-400">
                 <ChevronDown size={14} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />

@@ -382,8 +382,14 @@ export default function PlansPage() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm font-medium truncate">
-                                    {item.quantity}{item.unit === 'g' || item.unit === 'ml' ? item.unit : '× '} {item.name}
+                                    {item.alternatives?.length
+                                      ? (item.groupName || 'Optionen')
+                                      : `${item.quantity}${item.unit === 'g' || item.unit === 'ml' ? item.unit : '× '} ${item.name}`
+                                    }
                                   </span>
+                                  {item.alternatives?.length ? (
+                                    <span className="text-xs text-zinc-600">({item.alternatives.length + 1} Optionen)</span>
+                                  ) : null}
                                 </div>
                                 <p className="text-xs text-zinc-500">
                                   {itemTotals.calories} kcal · {itemTotals.protein}g P · {itemTotals.carbs}g C · {itemTotals.fat}g F
@@ -473,12 +479,20 @@ export default function PlansPage() {
                                     </div>
                                   </>
                                 ) : (
-                                  /* With alternatives: show all options equally */
+                                  /* With alternatives: show group name + all options */
                                   <div className="space-y-3">
+                                    {/* Group name */}
+                                    <Input
+                                      label="Gruppenname"
+                                      value={item.groupName || ''}
+                                      onChange={(v) => updateItem(meal.id, item.id, { groupName: v })}
+                                      placeholder="z.B. Beilage, Protein, Kohlenhydrate"
+                                    />
+
                                     {/* Option 1 (main item) */}
-                                    <div className="bg-zinc-900/50 rounded-lg p-3 space-y-3 border-l-2 border-emerald-500/30">
+                                    <div className="bg-zinc-900/50 rounded-lg p-3 space-y-3">
                                       <div className="flex items-center gap-2">
-                                        <span className="text-xs text-emerald-500/70 font-medium">Option 1</span>
+                                        <span className="text-xs text-zinc-500 font-medium">Option 1</span>
                                         <input
                                           type="text"
                                           value={item.name}
@@ -549,9 +563,9 @@ export default function PlansPage() {
                                     {item.alternatives.map((alt, index) => {
                                       const altTotals = getItemTotals(alt);
                                       return (
-                                        <div key={alt.id} className="bg-zinc-900/50 rounded-lg p-3 space-y-3 border-l-2 border-amber-500/30">
+                                        <div key={alt.id} className="bg-zinc-900/50 rounded-lg p-3 space-y-3">
                                           <div className="flex items-center gap-2">
-                                            <span className="text-xs text-amber-500/70 font-medium">Option {index + 2}</span>
+                                            <span className="text-xs text-zinc-500 font-medium">Option {index + 2}</span>
                                             <input
                                               type="text"
                                               value={alt.name}
