@@ -227,6 +227,7 @@ export default function PlanEditorPage() {
   const [mealsParent] = useAutoAnimate();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentPlanIdRef = useRef<string | null>(null);
+  const planCreatedRef = useRef(false);
 
   // Get other plans for import (exclude current editing plan)
   const otherPlans = Object.values(data.mealPlans).filter(p =>
@@ -240,19 +241,21 @@ export default function PlanEditorPage() {
       if (!currentPlanIdRef.current) {
         const newPlan = createEmptyPlan('Neuer Plan');
         currentPlanIdRef.current = newPlan.id;
+        planCreatedRef.current = false; // Not yet saved to store
         setEditingPlan(newPlan);
       }
     } else if (data.mealPlans[planId]) {
       // Load existing plan only if we haven't already or if planId changed
       if (currentPlanIdRef.current !== planId) {
         currentPlanIdRef.current = planId;
+        planCreatedRef.current = true; // Exists in store
         setEditingPlan(clonePlan(data.mealPlans[planId]));
         setExpandedMeals(new Set(data.mealPlans[planId].meals.map(m => m.id)));
       }
     }
   }, [isNew, planId, data.mealPlans]);
 
-  // Auto-save with debounce - simple and clean
+  // Auto-save with debounce - only reacts to editingPlan changes
   useEffect(() => {
     if (!editingPlan) return;
 
@@ -261,12 +264,11 @@ export default function PlanEditorPage() {
     }
 
     saveTimeoutRef.current = setTimeout(() => {
-      // Check if plan exists in store
-      const exists = !!data.mealPlans[editingPlan.id];
-      if (exists) {
+      if (planCreatedRef.current) {
         updatePlan(editingPlan);
       } else {
         createPlan(editingPlan);
+        planCreatedRef.current = true;
       }
     }, 500);
 
@@ -275,7 +277,8 @@ export default function PlanEditorPage() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [editingPlan, createPlan, updatePlan, data.mealPlans]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingPlan]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
