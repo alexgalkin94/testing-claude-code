@@ -352,7 +352,7 @@ export default function ShoppingPage() {
                   onClick={() => toggleItem(item.id)}
                   className={`flex items-start gap-3 p-3 -mx-1 rounded-lg cursor-pointer transition-all ${
                     isChecked ? 'bg-emerald-500/5' : 'hover:bg-zinc-800/50'
-                  } ${item.hasAlternatives && !isChecked ? 'border-l-2 border-amber-500/50' : ''}`}
+                  }`}
                 >
                   <div className={`w-5 h-5 mt-0.5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                     isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-700'
