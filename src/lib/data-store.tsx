@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import {
   MealPlan,
   DaySnapshot,
@@ -283,10 +283,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncError, setLastSyncError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const pendingSyncRef = useRef<Promise<void> | null>(null);
 
   // Load data on mount
   useEffect(() => {
     loadData();
+  }, []);
+
+  // Warn user before leaving if sync is pending
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (pendingSyncRef.current) {
+        e.preventDefault();
+        e.returnValue = 'Änderungen werden noch gespeichert...';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
   // Refresh from server when tab becomes visible or window gets focus
@@ -371,7 +386,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   // Sync to server
-  const syncToServer = useCallback(async (newData: AppData) => {
+  const syncToServer = useCallback(async (newData: AppData): Promise<string | null> => {
     setIsSyncing(true);
     setLastSyncError(null);
 
@@ -388,26 +403,43 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       const result = await response.json();
       console.log('Synced at:', result.lastSync);
+      setIsSyncing(false);
+      return result.lastSync;
     } catch (e) {
       console.error('Sync error:', e);
       setLastSyncError('Sync fehlgeschlagen');
+      setIsSyncing(false);
+      return null;
     }
-
-    setIsSyncing(false);
   }, []);
 
   // Update data and sync
   const updateData = useCallback((updater: (prev: AppData) => AppData) => {
     setData(prev => {
       const newData = updater(prev);
+      const dataWithTimestamp = { ...newData, lastSync: new Date().toISOString() };
 
-      // Save to localStorage immediately
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newData));
+      // Save to localStorage immediately with timestamp
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataWithTimestamp));
 
-      // Sync to server (debounced would be better but let's keep it simple)
-      syncToServer(newData);
+      // Sync to server and track the pending promise
+      const syncPromise = syncToServer(dataWithTimestamp).then((serverLastSync) => {
+        if (serverLastSync) {
+          // Update localStorage with server-confirmed timestamp
+          setData(current => {
+            const updated = { ...current, lastSync: serverLastSync };
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+            return updated;
+          });
+        }
+        pendingSyncRef.current = null;
+      }).catch(() => {
+        pendingSyncRef.current = null;
+      });
 
-      return newData;
+      pendingSyncRef.current = syncPromise;
+
+      return dataWithTimestamp;
     });
   }, [syncToServer]);
 

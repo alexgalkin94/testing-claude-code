@@ -212,7 +212,7 @@ export default function PlanEditorPage() {
   const planId = params.id as string;
   const isNew = planId === 'new';
 
-  const { data, createPlan, updatePlan } = useData();
+  const { data, createPlan, updatePlan, isSyncing, lastSyncError } = useData();
   const [editingPlan, setEditingPlan] = useState<MealPlan | null>(null);
   const [expandedMeals, setExpandedMeals] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -220,7 +220,6 @@ export default function PlanEditorPage() {
   const [activeMealId, setActiveMealId] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<'item' | 'meal' | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [deleteMealDialog, setDeleteMealDialog] = useState<{ open: boolean; mealId: string | null; mealName: string }>({ open: false, mealId: null, mealName: '' });
   const [mealsParent] = useAutoAnimate();
   const initializedRef = useRef(false);
@@ -257,14 +256,12 @@ export default function PlanEditorPage() {
 
     // Debounce save by 500ms
     saveTimeoutRef.current = setTimeout(() => {
-      setIsSaving(true);
       if (isNew) {
         createPlan(editingPlan);
         router.replace(`/plans/${editingPlan.id}`);
       } else {
         updatePlan(editingPlan);
       }
-      setTimeout(() => setIsSaving(false), 500);
     }, 500);
 
     return () => {
@@ -593,8 +590,10 @@ export default function PlanEditorPage() {
               </div>
             )}
           </div>
-          <span className={`text-xs px-2 py-1 rounded ${isSaving ? 'text-amber-500' : 'text-zinc-500'}`}>
-            {isSaving ? 'Speichert...' : 'Gespeichert'}
+          <span className={`text-xs px-2 py-1 rounded ${
+            lastSyncError ? 'text-red-500' : isSyncing ? 'text-amber-500' : 'text-emerald-500'
+          }`}>
+            {lastSyncError ? 'Fehler!' : isSyncing ? 'Speichert...' : 'Gespeichert'}
           </span>
         </div>
       </div>
