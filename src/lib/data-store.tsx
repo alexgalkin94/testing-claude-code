@@ -353,27 +353,42 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const loadData = async () => {
     setIsLoading(true);
 
+    let localData: AppData | null = null;
+
     // First, try to load from localStorage (fast)
     try {
       const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        const migrated = migrateData(parsed);
-        setData(migrated);
+        localData = migrateData(parsed);
+        setData(localData);
       }
     } catch (e) {
       console.error('Failed to load from localStorage:', e);
     }
 
-    // Then, load from server (source of truth)
+    // Then, load from server - but only use if newer than local
     try {
       const response = await fetch('/api/sync');
       if (response.ok) {
         const serverData = await response.json();
         if (serverData) {
           const migrated = migrateData(serverData);
-          setData(migrated);
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(migrated));
+          // Only use server data if it's newer than local data
+          const localLastSync = localData?.lastSync;
+          const serverLastSync = migrated.lastSync;
+
+          if (!localLastSync || (serverLastSync && serverLastSync > localLastSync)) {
+            setData(migrated);
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(migrated));
+            console.log('Loaded from server (newer):', serverLastSync);
+          } else {
+            console.log('Keeping local data (newer):', localLastSync, 'vs server:', serverLastSync);
+            // Re-sync local data to server since it's newer
+            if (localData) {
+              syncToServer(localData);
+            }
+          }
         }
       }
     } catch (e) {

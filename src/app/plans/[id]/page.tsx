@@ -251,6 +251,9 @@ export default function PlanEditorPage() {
     initializedRef.current = false;
   }, [planId]);
 
+  // Track if plan has been persisted (for new plans)
+  const persistedRef = useRef(!isNew);
+
   // Auto-save with debounce
   useEffect(() => {
     if (!editingPlan || !initializedRef.current) return;
@@ -262,10 +265,12 @@ export default function PlanEditorPage() {
 
     // Debounce save by 500ms
     saveTimeoutRef.current = setTimeout(() => {
-      if (isNew) {
+      if (!persistedRef.current) {
+        // First save for new plan - create it
         createPlan(editingPlan);
-        router.replace(`/plans/${editingPlan.id}`);
+        persistedRef.current = true;
       } else {
+        // Subsequent saves - update it
         updatePlan(editingPlan);
       }
     }, 500);
@@ -275,7 +280,7 @@ export default function PlanEditorPage() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [editingPlan, isNew, createPlan, updatePlan, router]);
+  }, [editingPlan, createPlan, updatePlan]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
