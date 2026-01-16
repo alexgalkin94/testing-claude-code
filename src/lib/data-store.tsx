@@ -5,7 +5,6 @@ import {
   MealPlan,
   DaySnapshot,
   ItemOverride,
-  DEFAULT_MEAL_PLANS,
   DEFAULT_PLAN_A,
   DEFAULT_PLAN_B,
 } from './mealPlan';
@@ -80,7 +79,7 @@ const DEFAULT_DATA: AppData = {
   checklist: {},
   extraCalories: {},
   dayTypes: {},
-  mealPlans: { ...DEFAULT_MEAL_PLANS },
+  mealPlans: {},
   dayPlanIds: {},
   daySnapshots: {},
   migrationVersion: CURRENT_MIGRATION_VERSION,
@@ -130,9 +129,7 @@ function migrateData(data: Partial<AppData>): AppData {
     ...DEFAULT_DATA,
     ...data,
     profile: { ...DEFAULT_DATA.profile, ...data?.profile },
-    mealPlans: data.mealPlans && Object.keys(data.mealPlans).length > 0
-      ? data.mealPlans
-      : { ...DEFAULT_MEAL_PLANS },
+    mealPlans: data.mealPlans || {},
     dayPlanIds: data.dayPlanIds || {},
     daySnapshots: data.daySnapshots || {},
   };
