@@ -231,9 +231,14 @@ export default function PlanEditorPage() {
   // Get other plans for import (exclude current plan)
   const otherPlans = Object.values(data.mealPlans).filter(p => p.id !== planId);
 
+  // Track if plan has been persisted (for new plans)
+  const persistedRef = useRef(!isNew);
+
+  // Initialize plan when planId changes
   useEffect(() => {
-    // Only initialize once per planId, not on every data change
-    if (initializedRef.current) return;
+    // Reset refs when planId changes
+    initializedRef.current = false;
+    persistedRef.current = !isNew;
 
     if (isNew) {
       const newPlan = createEmptyPlan('Neuer Plan');
@@ -245,14 +250,6 @@ export default function PlanEditorPage() {
       initializedRef.current = true;
     }
   }, [planId, isNew, data.mealPlans]);
-
-  // Reset initialized flag when planId changes
-  useEffect(() => {
-    initializedRef.current = false;
-  }, [planId]);
-
-  // Track if plan has been persisted (for new plans)
-  const persistedRef = useRef(!isNew);
 
   // Auto-save with debounce
   useEffect(() => {
