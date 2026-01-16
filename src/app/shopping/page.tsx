@@ -130,9 +130,11 @@ export default function ShoppingPage() {
           // Check if this item has alternatives
           const hasAlts = item.alternatives && item.alternatives.length > 0;
 
-          // Use item id as key for items with alternatives (they're unique per context)
-          // Use lowercase name for regular items (aggregate same items)
-          const key = hasAlts ? item.id : nameLower;
+          // Use groupName for items with alternatives, otherwise lowercase name
+          // This ensures same items are aggregated even across plans
+          const key = hasAlts
+            ? (item.groupName || item.name).toLowerCase()
+            : nameLower;
           const existing = itemMap.get(key);
 
           // Build alternatives list with scaled quantities
@@ -171,9 +173,13 @@ export default function ShoppingPage() {
             }
             // Scale up alternatives if they exist
             if (hasAlts && existing.alternatives.length > 0) {
-              for (let i = 0; i < existing.alternatives.length; i++) {
-                if (alternatives[i]) {
-                  existing.alternatives[i].quantity += alternatives[i].quantity;
+              for (let i = 0; i < alternatives.length; i++) {
+                const existingAlt = existing.alternatives.find(a => a.name.toLowerCase() === alternatives[i].name.toLowerCase());
+                if (existingAlt) {
+                  existingAlt.quantity += alternatives[i].quantity;
+                } else {
+                  // Add new alternative that wasn't in the first plan
+                  existing.alternatives.push(alternatives[i]);
                 }
               }
             }
