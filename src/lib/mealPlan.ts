@@ -498,6 +498,24 @@ export function clonePlan(plan: MealPlan): MealPlan {
   return JSON.parse(JSON.stringify(plan));
 }
 
+// Clone a meal with new IDs (for importing into another plan)
+export function cloneMeal(meal: Meal): Meal {
+  const cloneItem = (item: MealItem): MealItem => ({
+    ...item,
+    id: generateItemId(),
+    alternatives: item.alternatives?.map(alt => ({
+      ...alt,
+      id: generateItemId(),
+    })),
+  });
+
+  return {
+    ...meal,
+    id: generateMealId(),
+    items: meal.items.map(cloneItem),
+  };
+}
+
 // Legacy helper for backwards compatibility
 export function getPlan(type: 'A' | 'B'): DayPlan {
   return type === 'A' ? DAY_A : DAY_B;

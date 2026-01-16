@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Plus, ChevronLeft, ChevronDown, ChevronUp, X, Sunrise, Sun, Sunset, Cookie, Download, Trash2, GripVertical } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronDown, ChevronUp, X, Sunrise, Sun, Sunset, Cookie, Download, Trash2, GripVertical, Import, Check } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -35,6 +35,7 @@ import {
   createEmptyMeal,
   createEmptyItem,
   clonePlan,
+  cloneMeal,
   getPlanTotals,
   getMealTotals,
   getItemTotals,
@@ -221,9 +222,14 @@ export default function PlanEditorPage() {
   const [activeType, setActiveType] = useState<'item' | 'meal' | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [deleteMealDialog, setDeleteMealDialog] = useState<{ open: boolean; mealId: string | null; mealName: string }>({ open: false, mealId: null, mealName: '' });
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [selectedImportMeals, setSelectedImportMeals] = useState<Set<string>>(new Set());
   const [mealsParent] = useAutoAnimate();
   const initializedRef = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get other plans for import (exclude current plan)
+  const otherPlans = Object.values(data.mealPlans).filter(p => p.id !== planId);
 
   useEffect(() => {
     // Only initialize once per planId, not on every data change
@@ -374,7 +380,40 @@ export default function PlanEditorPage() {
       meals: [...editingPlan.meals, newMeal],
     });
     setExpandedMeals(prev => new Set([...prev, newMeal.id]));
-    
+  };
+
+  const toggleImportMeal = (mealKey: string) => {
+    setSelectedImportMeals(prev => {
+      const next = new Set(prev);
+      if (next.has(mealKey)) next.delete(mealKey);
+      else next.add(mealKey);
+      return next;
+    });
+  };
+
+  const importSelectedMeals = () => {
+    if (!editingPlan) return;
+    const mealsToImport: Meal[] = [];
+
+    for (const key of selectedImportMeals) {
+      const [planId, mealId] = key.split('::');
+      const plan = data.mealPlans[planId];
+      const meal = plan?.meals.find(m => m.id === mealId);
+      if (meal) {
+        mealsToImport.push(cloneMeal(meal));
+      }
+    }
+
+    if (mealsToImport.length > 0) {
+      setEditingPlan({
+        ...editingPlan,
+        meals: [...editingPlan.meals, ...mealsToImport],
+      });
+      setExpandedMeals(prev => new Set([...prev, ...mealsToImport.map(m => m.id)]));
+    }
+
+    setSelectedImportMeals(new Set());
+    setShowImportDialog(false);
   };
 
   const updateMeal = (mealId: string, updates: Partial<Meal>) => {
@@ -1012,12 +1051,22 @@ export default function PlanEditorPage() {
           );
         })}
 
-        <button
-          onClick={addMeal}
-          className="w-full py-4 px-4 rounded-xl border border-dashed border-zinc-700 text-zinc-500 hover:border-zinc-500 hover:text-zinc-300 text-sm flex items-center justify-center gap-2"
-        >
-          <Plus size={16} /> Mahlzeit hinzufügen
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={addMeal}
+            className="flex-1 py-4 px-4 rounded-xl border border-dashed border-zinc-700 text-zinc-500 hover:border-zinc-500 hover:text-zinc-300 text-sm flex items-center justify-center gap-2"
+          >
+            <Plus size={16} /> Neue Mahlzeit
+          </button>
+          {otherPlans.length > 0 && (
+            <button
+              onClick={() => setShowImportDialog(true)}
+              className="py-4 px-4 rounded-xl border border-dashed border-zinc-700 text-zinc-500 hover:border-amber-500/50 hover:text-amber-500 text-sm flex items-center justify-center gap-2"
+            >
+              <Import size={16} /> Importieren
+            </button>
+          )}
+        </div>
       </div>
       </SortableContext>
 
@@ -1041,6 +1090,77 @@ export default function PlanEditorPage() {
         ) : null}
       </DragOverlay>
       </DndContext>
+
+      {/* Import Dialog */}
+      {showImportDialog && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+              <h2 className="text-lg font-semibold">Mahlzeiten importieren</h2>
+              <button
+                onClick={() => {
+                  setShowImportDialog(false);
+                  setSelectedImportMeals(new Set());
+                }}
+                className="p-2 text-zinc-400 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {otherPlans.length === 0 ? (
+                <p className="text-zinc-500 text-center py-8">Keine anderen Pläne vorhanden</p>
+              ) : (
+                otherPlans.map(plan => (
+                  <div key={plan.id}>
+                    <p className="text-sm text-zinc-400 mb-2">{plan.name}</p>
+                    <div className="space-y-1">
+                      {plan.meals.map(meal => {
+                        const key = `${plan.id}::${meal.id}`;
+                        const isSelected = selectedImportMeals.has(key);
+                        const mealTotals = getMealTotals(meal);
+                        return (
+                          <button
+                            key={meal.id}
+                            onClick={() => toggleImportMeal(key)}
+                            className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors ${
+                              isSelected
+                                ? 'bg-amber-500/20 border border-amber-500/50'
+                                : 'bg-zinc-800/50 hover:bg-zinc-800 border border-transparent'
+                            }`}
+                          >
+                            <div className="text-zinc-400">
+                              <MealIcon icon={meal.icon} size={18} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{meal.name}</p>
+                              <p className="text-xs text-zinc-500">
+                                {mealTotals.calories} kcal · {mealTotals.protein}g P · {meal.items.length} Items
+                              </p>
+                            </div>
+                            {isSelected && (
+                              <Check size={18} className="text-amber-500 shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {selectedImportMeals.size > 0 && (
+              <div className="p-4 border-t border-zinc-800">
+                <Button onClick={importSelectedMeals} className="w-full">
+                  {selectedImportMeals.size} Mahlzeit{selectedImportMeals.size > 1 ? 'en' : ''} importieren
+                </Button>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
 
       <ConfirmDialog
         open={deleteMealDialog.open}
