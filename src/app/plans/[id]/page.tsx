@@ -231,18 +231,26 @@ export default function PlanEditorPage() {
   // Get other plans for import (exclude current plan)
   const otherPlans = Object.values(data.mealPlans).filter(p => p.id !== planId);
 
-  // Track if plan has been persisted (for new plans)
-  const persistedRef = useRef(!isNew);
+  // Track the created plan ID (for new plans that haven't been persisted yet)
+  const createdPlanIdRef = useRef<string | null>(null);
+  const lastPlanIdRef = useRef(planId);
 
   // Initialize plan when planId changes
   useEffect(() => {
-    // Reset refs when planId changes
-    initializedRef.current = false;
-    persistedRef.current = !isNew;
+    // Only reset when planId actually changes
+    if (lastPlanIdRef.current !== planId) {
+      initializedRef.current = false;
+      createdPlanIdRef.current = null;
+      lastPlanIdRef.current = planId;
+    }
+
+    // Don't re-initialize if already done
+    if (initializedRef.current) return;
 
     if (isNew) {
       const newPlan = createEmptyPlan('Neuer Plan');
       setEditingPlan(newPlan);
+      createdPlanIdRef.current = newPlan.id;
       initializedRef.current = true;
     } else if (data.mealPlans[planId]) {
       setEditingPlan(clonePlan(data.mealPlans[planId]));
@@ -250,6 +258,14 @@ export default function PlanEditorPage() {
       initializedRef.current = true;
     }
   }, [planId, isNew, data.mealPlans]);
+
+  // Track if current plan exists in data store
+  const planExistsRef = useRef(!isNew);
+  useEffect(() => {
+    if (editingPlan) {
+      planExistsRef.current = !!data.mealPlans[editingPlan.id];
+    }
+  }, [data.mealPlans, editingPlan]);
 
   // Auto-save with debounce
   useEffect(() => {
@@ -262,13 +278,11 @@ export default function PlanEditorPage() {
 
     // Debounce save by 500ms
     saveTimeoutRef.current = setTimeout(() => {
-      if (!persistedRef.current) {
-        // First save for new plan - create it
-        createPlan(editingPlan);
-        persistedRef.current = true;
-      } else {
-        // Subsequent saves - update it
+      if (planExistsRef.current) {
         updatePlan(editingPlan);
+      } else {
+        createPlan(editingPlan);
+        planExistsRef.current = true;
       }
     }, 500);
 
