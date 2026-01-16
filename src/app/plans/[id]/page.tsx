@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Plus, ChevronLeft, ChevronDown, ChevronUp, X, Sunrise, Sun, Sunset, Cookie, Download, Trash2 } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronDown, ChevronUp, X, Sunrise, Sun, Sunset, Cookie, Download, Trash2, GripVertical } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -69,16 +69,30 @@ function SortableItem({ id, mealId, children }: { id: string; mealId: string; ch
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className={`cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'opacity-50' : ''}`}
+      className={`flex items-stretch ${isDragging ? 'opacity-50' : ''}`}
     >
-      {children}
+      <button
+        {...attributes}
+        {...listeners}
+        className="flex items-center px-1 text-zinc-600 hover:text-zinc-400 cursor-grab active:cursor-grabbing touch-none"
+        aria-label="Drag to reorder"
+      >
+        <GripVertical size={16} />
+      </button>
+      <div className="flex-1 min-w-0">{children}</div>
     </div>
   );
 }
 
-function SortableMeal({ id, children }: { id: string; children: React.ReactNode }) {
+interface SortableMealRenderProps {
+  dragHandleProps: {
+    ref: (node: HTMLElement | null) => void;
+    attributes: ReturnType<typeof useSortable>['attributes'];
+    listeners: ReturnType<typeof useSortable>['listeners'];
+  };
+}
+
+function SortableMeal({ id, children }: { id: string; children: (props: SortableMealRenderProps) => React.ReactNode }) {
   const {
     attributes,
     listeners,
@@ -86,6 +100,7 @@ function SortableMeal({ id, children }: { id: string; children: React.ReactNode 
     transform,
     transition,
     isDragging,
+    setActivatorNodeRef,
   } = useSortable({ id, data: { type: 'meal' } });
 
   const style = {
@@ -97,11 +112,15 @@ function SortableMeal({ id, children }: { id: string; children: React.ReactNode 
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className={`cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-50 z-50' : ''}`}
+      className={isDragging ? 'opacity-50 z-50' : ''}
     >
-      {children}
+      {children({
+        dragHandleProps: {
+          ref: setActivatorNodeRef,
+          attributes,
+          listeners,
+        },
+      })}
     </div>
   );
 }
@@ -612,16 +631,28 @@ export default function PlanEditorPage() {
 
           return (
             <SortableMeal key={meal.id} id={meal.id}>
+              {({ dragHandleProps }) => (
             <Card className="p-0 overflow-hidden">
               {/* Meal Header */}
               <div
-                className="flex items-center gap-3 p-4 cursor-pointer hover:bg-zinc-800/50"
+                className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 cursor-pointer hover:bg-zinc-800/50"
                 onClick={() => toggleMealExpanded(meal.id)}
               >
+                {/* Drag Handle */}
+                <button
+                  ref={dragHandleProps.ref}
+                  {...dragHandleProps.attributes}
+                  {...dragHandleProps.listeners}
+                  onClick={(e) => e.stopPropagation()}
+                  className="p-1 text-zinc-600 hover:text-zinc-400 cursor-grab active:cursor-grabbing touch-none"
+                  aria-label="Drag to reorder"
+                >
+                  <GripVertical size={16} />
+                </button>
                 <div className="text-zinc-400">
                   <MealIcon icon={meal.icon} />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <input
                     type="text"
                     value={meal.name}
@@ -652,14 +683,14 @@ export default function PlanEditorPage() {
               {/* Meal Items */}
               {isExpanded && (
                 <div className="border-t border-zinc-800">
-                  {/* Icon & Time Selection */}
-                  <div className="flex items-center gap-4 p-4 border-b border-zinc-800/50">
+                  {/* Icon & Time Selection - stack on mobile */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 sm:p-4 border-b border-zinc-800/50">
                     <div className="flex gap-2">
                       {(['sunrise', 'sun', 'sunset', 'cookie'] as const).map((icon) => (
                         <button
                           key={icon}
                           onClick={() => updateMeal(meal.id, { icon })}
-                          className={`p-2 rounded ${
+                          className={`p-2.5 sm:p-2 rounded ${
                             meal.icon === icon
                               ? 'bg-white text-black'
                               : 'bg-zinc-800 text-zinc-400 hover:text-white'
@@ -674,7 +705,7 @@ export default function PlanEditorPage() {
                       value={meal.time}
                       onChange={(e) => updateMeal(meal.id, { time: e.target.value })}
                       placeholder="Zeit (z.B. 12:00)"
-                      className="flex-1 bg-zinc-800 rounded px-3 py-2 text-sm"
+                      className="flex-1 bg-zinc-800 rounded px-3 py-2.5 sm:py-2 text-sm"
                     />
                   </div>
 
@@ -728,42 +759,43 @@ export default function PlanEditorPage() {
                             <div className="p-3 pt-0 space-y-3 border-t border-zinc-700/50">
                               {(!item.alternatives || item.alternatives.length === 0) ? (
                                 <>
-                                  <div className="grid grid-cols-2 gap-3">
+                                  {/* Name - full width */}
+                                  <Input
+                                    label="Name"
+                                    value={item.name}
+                                    onChange={(v) => updateItem(meal.id, item.id, { name: v })}
+                                    placeholder="z.B. Eier"
+                                  />
+                                  {/* Quantity & Unit */}
+                                  <div className="grid grid-cols-2 gap-2">
                                     <Input
-                                      label="Name"
-                                      value={item.name}
-                                      onChange={(v) => updateItem(meal.id, item.id, { name: v })}
-                                      placeholder="z.B. Eier"
+                                      label="Menge"
+                                      type="number"
+                                      value={item.quantity.toString()}
+                                      onChange={(v) => updateItem(meal.id, item.id, { quantity: parseFloat(v) || 0 })}
                                     />
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <Input
-                                        label="Menge"
-                                        type="number"
-                                        value={item.quantity.toString()}
-                                        onChange={(v) => updateItem(meal.id, item.id, { quantity: parseFloat(v) || 0 })}
-                                      />
-                                      <div>
-                                        <label className="block text-sm text-zinc-400 mb-1.5">Einheit</label>
-                                        <select
-                                          value={item.unit}
-                                          onChange={(e) => updateItem(meal.id, item.id, { unit: e.target.value })}
-                                          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-zinc-600"
-                                        >
-                                          <option value="g">g</option>
-                                          <option value="ml">ml</option>
-                                          <option value="Stück">Stück</option>
-                                          <option value="Portion">Portion</option>
-                                          <option value="Scheiben">Scheiben</option>
-                                          <option value="EL">EL</option>
-                                          <option value="TL">TL</option>
-                                        </select>
-                                      </div>
+                                    <div>
+                                      <label className="block text-xs sm:text-sm text-zinc-400 mb-1.5">Einheit</label>
+                                      <select
+                                        value={item.unit}
+                                        onChange={(e) => updateItem(meal.id, item.id, { unit: e.target.value })}
+                                        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 text-sm text-white focus:outline-none focus:border-zinc-600"
+                                      >
+                                        <option value="g">g</option>
+                                        <option value="ml">ml</option>
+                                        <option value="Stück">Stück</option>
+                                        <option value="Portion">Portion</option>
+                                        <option value="Scheiben">Scheiben</option>
+                                        <option value="EL">EL</option>
+                                        <option value="TL">TL</option>
+                                      </select>
                                     </div>
                                   </div>
                                   <p className="text-xs text-zinc-500 font-medium mt-2">
                                     Nährwerte pro {item.unit === 'g' ? '100g' : item.unit === 'ml' ? '100ml' : 'Einheit'}:
                                   </p>
-                                  <div className="grid grid-cols-4 gap-2">
+                                  {/* Macros - 2x2 on mobile */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                     <Input
                                       label="kcal"
                                       type="number"
@@ -804,12 +836,12 @@ export default function PlanEditorPage() {
 
                                   <div className="bg-zinc-900/50 rounded-lg p-3 space-y-3">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-xs text-zinc-500 font-medium">Option 1</span>
+                                      <span className="text-xs text-zinc-500 font-medium shrink-0">Option 1</span>
                                       <input
                                         type="text"
                                         value={item.name}
                                         onChange={(e) => updateItem(meal.id, item.id, { name: e.target.value })}
-                                        className="flex-1 text-sm font-medium bg-transparent border-none outline-none"
+                                        className="flex-1 min-w-0 text-sm font-medium bg-transparent border-none outline-none"
                                         placeholder="Name"
                                       />
                                     </div>
@@ -821,11 +853,11 @@ export default function PlanEditorPage() {
                                         onChange={(v) => updateItem(meal.id, item.id, { quantity: parseFloat(v) || 0 })}
                                       />
                                       <div>
-                                        <label className="block text-sm text-zinc-400 mb-1.5">Einheit</label>
+                                        <label className="block text-xs sm:text-sm text-zinc-400 mb-1.5">Einheit</label>
                                         <select
                                           value={item.unit}
                                           onChange={(e) => updateItem(meal.id, item.id, { unit: e.target.value })}
-                                          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-zinc-600"
+                                          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 text-sm text-white focus:outline-none focus:border-zinc-600"
                                         >
                                           <option value="g">g</option>
                                           <option value="ml">ml</option>
@@ -840,7 +872,7 @@ export default function PlanEditorPage() {
                                     <p className="text-xs text-zinc-500 font-medium">
                                       Nährwerte pro {item.unit === 'g' ? '100g' : item.unit === 'ml' ? '100ml' : 'Einheit'}:
                                     </p>
-                                    <div className="grid grid-cols-4 gap-2">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                       <Input
                                         label="kcal"
                                         type="number"
@@ -876,19 +908,19 @@ export default function PlanEditorPage() {
                                     return (
                                       <div key={alt.id} className="bg-zinc-900/50 rounded-lg p-3 space-y-3">
                                         <div className="flex items-center gap-2">
-                                          <span className="text-xs text-zinc-500 font-medium">Option {index + 2}</span>
+                                          <span className="text-xs text-zinc-500 font-medium shrink-0">Option {index + 2}</span>
                                           <input
                                             type="text"
                                             value={alt.name}
                                             onChange={(e) => updateAlternative(meal.id, item.id, alt.id, { name: e.target.value })}
-                                            className="flex-1 text-sm font-medium bg-transparent border-none outline-none"
+                                            className="flex-1 min-w-0 text-sm font-medium bg-transparent border-none outline-none"
                                             placeholder="Name"
                                           />
                                           <button
                                             onClick={() => deleteAlternative(meal.id, item.id, alt.id)}
-                                            className="p-1 text-zinc-600 hover:text-red-500"
+                                            className="p-1.5 text-zinc-600 hover:text-red-500"
                                           >
-                                            <X size={12} />
+                                            <X size={14} />
                                           </button>
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
@@ -899,11 +931,11 @@ export default function PlanEditorPage() {
                                             onChange={(v) => updateAlternative(meal.id, item.id, alt.id, { quantity: parseFloat(v) || 0 })}
                                           />
                                           <div>
-                                            <label className="block text-xs text-zinc-500 mb-1">Einheit</label>
+                                            <label className="block text-xs sm:text-sm text-zinc-400 mb-1.5">Einheit</label>
                                             <select
                                               value={alt.unit}
                                               onChange={(e) => updateAlternative(meal.id, item.id, alt.id, { unit: e.target.value })}
-                                              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-zinc-600"
+                                              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 text-sm text-white focus:outline-none focus:border-zinc-600"
                                             >
                                               <option value="g">g</option>
                                               <option value="ml">ml</option>
@@ -918,7 +950,7 @@ export default function PlanEditorPage() {
                                         <p className="text-xs text-zinc-500 font-medium">
                                           Nährwerte pro {alt.unit === 'g' ? '100g' : alt.unit === 'ml' ? '100ml' : 'Einheit'}:
                                         </p>
-                                        <div className="grid grid-cols-4 gap-2">
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                           <Input
                                             label="kcal"
                                             type="number"
@@ -976,6 +1008,7 @@ export default function PlanEditorPage() {
                 </div>
               )}
             </Card>
+              )}
             </SortableMeal>
           );
         })}

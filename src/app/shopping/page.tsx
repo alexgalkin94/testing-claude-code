@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Check, Minus, Plus, RotateCcw, ChevronDown, ChevronUp, Home } from 'lucide-react';
 import Card from '@/components/Card';
 import { useData } from '@/lib/data-store';
 import { MealItem, getItemTotals } from '@/lib/mealPlan';
+
+const STORAGE_KEY = 'shopping-list-state';
 
 interface AlternativeOption {
   name: string;
@@ -43,19 +45,51 @@ export default function ShoppingPage() {
   const { data } = useData();
   const plans = Object.values(data.mealPlans);
 
-  // Days per plan
-  const [planDays, setPlanDays] = useState<Record<string, number>>(() => {
-    const initial: Record<string, number> = {};
-    plans.forEach(p => { initial[p.id] = 0; });
-    return initial;
-  });
-
-  // Items already at home (keyed by item id)
+  // Load saved state from localStorage
+  const [planDays, setPlanDays] = useState<Record<string, number>>({});
   const [atHome, setAtHome] = useState<Record<string, number>>({});
   const [showAtHome, setShowAtHome] = useState(false);
-
-  // Checked items (keyed by item id)
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const state = JSON.parse(saved);
+        if (state.planDays) setPlanDays(state.planDays);
+        if (state.atHome) setAtHome(state.atHome);
+        if (state.checkedItems) setCheckedItems(new Set(state.checkedItems));
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Initialize planDays for any new plans
+  useEffect(() => {
+    if (!isLoaded) return;
+    setPlanDays(prev => {
+      const next = { ...prev };
+      for (const p of plans) {
+        if (!(p.id in next)) next[p.id] = 0;
+      }
+      return next;
+    });
+  }, [plans, isLoaded]);
+
+  // Save to localStorage whenever state changes
+  useEffect(() => {
+    if (!isLoaded) return;
+    const state = {
+      planDays,
+      atHome,
+      checkedItems: Array.from(checkedItems),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }, [planDays, atHome, checkedItems, isLoaded]);
 
   const toggleItem = (id: string) => {
     setCheckedItems(prev => {
@@ -69,6 +103,11 @@ export default function ShoppingPage() {
   const resetList = () => {
     setCheckedItems(new Set());
     setAtHome({});
+    setPlanDays(prev => {
+      const next = { ...prev };
+      for (const key of Object.keys(next)) next[key] = 0;
+      return next;
+    });
   };
 
   const totalDays = Object.values(planDays).reduce((a, b) => a + b, 0);
@@ -210,8 +249,8 @@ export default function ShoppingPage() {
           <p className="text-zinc-500 text-sm">Dynamische</p>
           <h1 className="text-xl font-semibold tracking-tight">Einkaufsliste</h1>
         </div>
-        {(checkedItems.size > 0 || Object.keys(atHome).length > 0) && (
-          <button onClick={resetList} className="p-2 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-800">
+        {(totalDays > 0 || checkedItems.size > 0 || Object.values(atHome).some(v => v > 0)) && (
+          <button onClick={resetList} className="p-2 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-800" title="Liste zurücksetzen">
             <RotateCcw size={20} />
           </button>
         )}
