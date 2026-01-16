@@ -26,17 +26,19 @@ export interface AppData {
     blurPhotos: boolean;
   };
   weights: Array<{ date: string; weight: number }>;
-  checklist: { [date: string]: string[] };
+  // Per-plan checklists: { [date]: { [planId]: string[] } }
+  checklist: { [date: string]: { [planId: string]: string[] } };
   extraCalories: { [date: string]: number };
   dayTypes: { [date: string]: 'A' | 'B' };
   mealPlans: { [planId: string]: MealPlan };
   dayPlanIds: { [date: string]: string };
-  daySnapshots: { [date: string]: DaySnapshot };
+  // Per-plan snapshots: { [date]: { [planId]: DaySnapshot } }
+  daySnapshots: { [date: string]: { [planId: string]: DaySnapshot } };
   migrationVersion?: number;
   lastSync?: string;
 }
 
-const CURRENT_MIGRATION_VERSION = 4;
+const CURRENT_MIGRATION_VERSION = 5;
 const LOCAL_STORAGE_KEY = 'cutboard_all_data';
 const QUERY_KEY = ['appData'];
 
@@ -63,6 +65,21 @@ const DEFAULT_DATA: AppData = {
   migrationVersion: CURRENT_MIGRATION_VERSION,
 };
 
+// Helper to check if checklist is old format (array) or new format (object with planIds)
+function isOldChecklistFormat(checklist: unknown): checklist is { [date: string]: string[] } {
+  if (!checklist || typeof checklist !== 'object') return false;
+  const firstValue = Object.values(checklist)[0];
+  return Array.isArray(firstValue);
+}
+
+// Helper to check if daySnapshots is old format (DaySnapshot directly) or new format
+function isOldSnapshotFormat(snapshots: unknown): snapshots is { [date: string]: DaySnapshot } {
+  if (!snapshots || typeof snapshots !== 'object') return false;
+  const firstValue = Object.values(snapshots)[0] as Record<string, unknown>;
+  // Old format has 'planId' directly on the snapshot, new format has planId as key
+  return firstValue && 'planId' in firstValue && 'meals' in firstValue;
+}
+
 // Migration function
 function migrateData(data: Partial<AppData>): AppData {
   const today = new Date().toISOString().split('T')[0];
@@ -73,11 +90,35 @@ function migrateData(data: Partial<AppData>): AppData {
     profile: { ...DEFAULT_DATA.profile, ...data?.profile },
     mealPlans: data.mealPlans || {},
     dayPlanIds: data.dayPlanIds || {},
-    daySnapshots: data.daySnapshots || {},
+    checklist: {},
+    daySnapshots: {},
   };
 
   const needsMigration = !data.migrationVersion || data.migrationVersion < CURRENT_MIGRATION_VERSION;
 
+  // Migrate old flat checklist format to per-plan format
+  if (data.checklist && isOldChecklistFormat(data.checklist)) {
+    for (const [date, items] of Object.entries(data.checklist)) {
+      const planId = data.dayPlanIds?.[date] ||
+        (data.dayTypes?.[date] === 'B' ? DEFAULT_PLAN_B.id : DEFAULT_PLAN_A.id);
+      migrated.checklist[date] = { [planId]: items };
+    }
+  } else if (data.checklist) {
+    migrated.checklist = data.checklist as AppData['checklist'];
+  }
+
+  // Migrate old flat daySnapshots format to per-plan format
+  if (data.daySnapshots && isOldSnapshotFormat(data.daySnapshots)) {
+    for (const [date, snapshot] of Object.entries(data.daySnapshots)) {
+      const planId = snapshot.planId || data.dayPlanIds?.[date] ||
+        (data.dayTypes?.[date] === 'B' ? DEFAULT_PLAN_B.id : DEFAULT_PLAN_A.id);
+      migrated.daySnapshots[date] = { [planId]: snapshot };
+    }
+  } else if (data.daySnapshots) {
+    migrated.daySnapshots = data.daySnapshots as AppData['daySnapshots'];
+  }
+
+  // Legacy dayTypes migration (for very old data)
   if (needsMigration && data.dayTypes && Object.keys(data.dayTypes).length > 0) {
     for (const [date, dayType] of Object.entries(data.dayTypes)) {
       if (date === today) continue;
@@ -85,8 +126,12 @@ function migrateData(data: Partial<AppData>): AppData {
       if (!migrated.dayPlanIds[date]) {
         migrated.dayPlanIds[date] = plan.id;
       }
-      if (!migrated.daySnapshots[date]) {
-        migrated.daySnapshots[date] = {
+      // Only create snapshot if not already migrated
+      if (!migrated.daySnapshots[date]?.[plan.id]) {
+        if (!migrated.daySnapshots[date]) {
+          migrated.daySnapshots[date] = {};
+        }
+        migrated.daySnapshots[date][plan.id] = {
           planId: plan.id,
           planName: plan.name,
           meals: plan.meals,
@@ -195,6 +240,7 @@ interface DataContextType {
   setExtraCalories: (date: string, calories: number) => void;
   setDayType: (date: string, type: 'A' | 'B') => void;
   getDayType: (date: string) => 'A' | 'B';
+  getChecklistItems: (date: string, planId?: string) => string[];
   forceSync: () => Promise<void>;
   createPlan: (plan: MealPlan) => void;
   updatePlan: (plan: MealPlan) => void;
@@ -202,7 +248,7 @@ interface DataContextType {
   setDayPlanId: (date: string, planId: string) => void;
   getDayPlanId: (date: string) => string;
   getDayPlan: (date: string) => MealPlan | null;
-  getDaySnapshot: (date: string) => DaySnapshot | null;
+  getDaySnapshot: (date: string, planId?: string) => DaySnapshot | null;
   setDayOverride: (date: string, itemId: string, updates: { quantity?: number; alternativeId?: string }) => void;
   removeDayOverride: (date: string, itemId: string) => void;
   getDayOverrides: (date: string) => ItemOverride[];
@@ -284,26 +330,46 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
   }, [updateData]);
 
-  // Checklist
+  // Checklist - now per-plan
   const toggleChecklistItem = useCallback((date: string, itemId: string) => {
     updateData(prev => {
-      const current = prev.checklist[date] || [];
+      // Get current plan for this date
+      const planId = prev.dayPlanIds[date] || DEFAULT_PLAN_A.id;
+      const dateChecklist = prev.checklist[date] || {};
+      const current = dateChecklist[planId] || [];
       const newItems = current.includes(itemId)
         ? current.filter(id => id !== itemId)
         : [...current, itemId];
       return {
         ...prev,
-        checklist: { ...prev.checklist, [date]: newItems },
+        checklist: {
+          ...prev.checklist,
+          [date]: { ...dateChecklist, [planId]: newItems },
+        },
       };
     });
   }, [updateData]);
 
   const setChecklistItems = useCallback((date: string, items: string[]) => {
-    updateData(prev => ({
-      ...prev,
-      checklist: { ...prev.checklist, [date]: items },
-    }));
+    updateData(prev => {
+      // Get current plan for this date
+      const planId = prev.dayPlanIds[date] || DEFAULT_PLAN_A.id;
+      const dateChecklist = prev.checklist[date] || {};
+      return {
+        ...prev,
+        checklist: {
+          ...prev.checklist,
+          [date]: { ...dateChecklist, [planId]: items },
+        },
+      };
+    });
   }, [updateData]);
+
+  // Get checklist items for a specific date and plan
+  const getChecklistItems = useCallback((date: string, planId?: string): string[] => {
+    const effectivePlanId = planId || data.dayPlanIds[date] || DEFAULT_PLAN_A.id;
+    return data.checklist[date]?.[effectivePlanId] || [];
+  }, [data.checklist, data.dayPlanIds]);
 
   // Extra calories
   const setExtraCalories = useCallback((date: string, calories: number) => {
@@ -370,30 +436,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return DEFAULT_PLAN_A.id;
   }, [data.dayPlanIds, data.dayTypes]);
 
-  // Day plan/snapshot
+  // Day plan/snapshot - now per-plan
   const getDayPlan = useCallback((date: string): MealPlan | null => {
-    const snapshot = data.daySnapshots?.[date];
+    const planId = getDayPlanId(date);
+    const snapshot = data.daySnapshots?.[date]?.[planId];
     if (snapshot) {
       return {
         id: snapshot.planId,
-        name: 'Snapshot',
+        name: snapshot.planName || 'Snapshot',
         meals: snapshot.meals,
       };
     }
-    const planId = getDayPlanId(date);
     if (planId === DEFAULT_PLAN_A.id) return DEFAULT_PLAN_A;
     if (planId === DEFAULT_PLAN_B.id) return DEFAULT_PLAN_B;
     return data.mealPlans[planId] || DEFAULT_PLAN_A;
   }, [data.daySnapshots, data.mealPlans, getDayPlanId]);
 
-  const getDaySnapshot = useCallback((date: string): DaySnapshot | null => {
-    return data.daySnapshots?.[date] || null;
-  }, [data.daySnapshots]);
+  const getDaySnapshot = useCallback((date: string, planId?: string): DaySnapshot | null => {
+    const effectivePlanId = planId || getDayPlanId(date);
+    return data.daySnapshots?.[date]?.[effectivePlanId] || null;
+  }, [data.daySnapshots, getDayPlanId]);
 
-  // Day overrides
+  // Day overrides - now per-plan
   const setDayOverride = useCallback((date: string, itemId: string, updates: { quantity?: number; alternativeId?: string }) => {
     updateData(prev => {
-      const snapshot = prev.daySnapshots[date];
+      const planId = prev.dayPlanIds[date] || DEFAULT_PLAN_A.id;
+      const snapshot = prev.daySnapshots[date]?.[planId];
       if (!snapshot) return prev;
 
       const existingIndex = snapshot.overrides?.findIndex(o => o.itemId === itemId) ?? -1;
@@ -406,7 +474,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ...prev,
         daySnapshots: {
           ...prev.daySnapshots,
-          [date]: { ...snapshot, overrides: newOverrides },
+          [date]: {
+            ...prev.daySnapshots[date],
+            [planId]: { ...snapshot, overrides: newOverrides },
+          },
         },
       };
     });
@@ -414,7 +485,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const removeDayOverride = useCallback((date: string, itemId: string) => {
     updateData(prev => {
-      const snapshot = prev.daySnapshots[date];
+      const planId = prev.dayPlanIds[date] || DEFAULT_PLAN_A.id;
+      const snapshot = prev.daySnapshots[date]?.[planId];
       if (!snapshot) return prev;
 
       return {
@@ -422,8 +494,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         daySnapshots: {
           ...prev.daySnapshots,
           [date]: {
-            ...snapshot,
-            overrides: snapshot.overrides?.filter(o => o.itemId !== itemId) || [],
+            ...prev.daySnapshots[date],
+            [planId]: {
+              ...snapshot,
+              overrides: snapshot.overrides?.filter(o => o.itemId !== itemId) || [],
+            },
           },
         },
       };
@@ -431,14 +506,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [updateData]);
 
   const getDayOverrides = useCallback((date: string): ItemOverride[] => {
-    return data.daySnapshots?.[date]?.overrides || [];
-  }, [data.daySnapshots]);
-
-  // Ensure day snapshot exists
-  const ensureDaySnapshot = useCallback((date: string) => {
-    if (data.daySnapshots?.[date]) return;
-
     const planId = getDayPlanId(date);
+    return data.daySnapshots?.[date]?.[planId]?.overrides || [];
+  }, [data.daySnapshots, getDayPlanId]);
+
+  // Ensure day snapshot exists for current plan
+  const ensureDaySnapshot = useCallback((date: string) => {
+    const planId = getDayPlanId(date);
+    // Check if snapshot exists for this specific plan
+    if (data.daySnapshots?.[date]?.[planId]) return;
+
     let plan: MealPlan;
     if (planId === DEFAULT_PLAN_A.id) {
       plan = DEFAULT_PLAN_A;
@@ -453,10 +530,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       daySnapshots: {
         ...prev.daySnapshots,
         [date]: {
-          planId: plan.id,
-          planName: plan.name,
-          meals: JSON.parse(JSON.stringify(plan.meals)),
-          overrides: [],
+          ...prev.daySnapshots[date],
+          [planId]: {
+            planId: plan.id,
+            planName: plan.name,
+            meals: JSON.parse(JSON.stringify(plan.meals)),
+            overrides: [],
+          },
         },
       },
     }));
@@ -481,6 +561,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setExtraCalories,
         setDayType,
         getDayType,
+        getChecklistItems,
         forceSync,
         createPlan,
         updatePlan,

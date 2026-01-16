@@ -46,7 +46,7 @@ function getExpectedWeights(
 }
 
 export default function WeightPage() {
-  const { data, isLoading, addWeight } = useData();
+  const { data, isLoading, addWeight, getChecklistItems, getDayPlanId, getDaySnapshot } = useData();
   const [showForm, setShowForm] = useState(false);
   const [newWeight, setNewWeight] = useState('');
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -107,15 +107,16 @@ export default function WeightPage() {
 
       for (let i = 7; i < Math.min(daysElapsed, 35); i++) {
         const dateStr = format(subDays(today, daysElapsed - i), 'yyyy-MM-dd');
-        const dayCheckedItems = data.checklist[dateStr] || [];
+        // Get the plan that was selected for this day
+        const dayPlanId = getDayPlanId(dateStr);
+        const dayCheckedItems = getChecklistItems(dateStr, dayPlanId);
         const extraCals = data.extraCalories?.[dateStr] || 0;
 
-        // Get the plan for this specific date (use snapshot if exists, else default plans)
-        const daySnapshot = data.daySnapshots?.[dateStr];
-        const dayType = data.dayTypes?.[dateStr] || 'A';
+        // Get the snapshot for this specific date and plan
+        const daySnapshot = getDaySnapshot(dateStr, dayPlanId);
         const dayPlan = daySnapshot
           ? { meals: daySnapshot.meals }
-          : (dayType === 'A' ? DEFAULT_PLAN_A : DEFAULT_PLAN_B);
+          : (dayPlanId === DEFAULT_PLAN_A.id ? DEFAULT_PLAN_A : DEFAULT_PLAN_B);
         const dayOverrides = daySnapshot?.overrides || [];
 
         let dayCalories = extraCals;
@@ -161,7 +162,7 @@ export default function WeightPage() {
       weightsNeeded,
       weeklyTrend,
     };
-  }, [data.profile, data.weights, data.checklist, data.extraCalories, data.dayTypes, data.daySnapshots]);
+  }, [data.profile, data.weights, data.extraCalories, getChecklistItems, getDayPlanId, getDaySnapshot]);
 
   const handleSubmit = () => {
     if (!newWeight) return;
