@@ -225,6 +225,7 @@ export default function PlanEditorPage() {
   const [mealsParent] = useAutoAnimate();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadedPlanIdRef = useRef<string | null>(null);
+  const justLoadedRef = useRef(false);
 
   // Get other plans for import (exclude current editing plan)
   const otherPlans = Object.values(data.mealPlans).filter(p => p.id !== planId);
@@ -234,14 +235,21 @@ export default function PlanEditorPage() {
     const plan = data.mealPlans[planId];
     if (plan && loadedPlanIdRef.current !== planId) {
       loadedPlanIdRef.current = planId;
+      justLoadedRef.current = true; // Mark that we just loaded - don't save
       setEditingPlan(clonePlan(plan));
       setExpandedMeals(new Set(plan.meals.map(m => m.id)));
     }
   }, [planId, data.mealPlans]);
 
-  // Auto-save with debounce
+  // Auto-save with debounce - only when user edits, not on load
   useEffect(() => {
     if (!editingPlan || loadedPlanIdRef.current !== planId) return;
+
+    // Skip save right after loading
+    if (justLoadedRef.current) {
+      justLoadedRef.current = false;
+      return;
+    }
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);

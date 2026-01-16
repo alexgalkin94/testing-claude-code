@@ -248,21 +248,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
       console.error('Sync error:', err);
     },
-    onSettled: () => {
-      // Refetch after mutation
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-    },
+    // No onSettled - optimistic update is enough, no refetch needed
   });
 
   const isSyncing = mutation.isPending;
   const lastSyncError = mutation.isError ? 'Sync fehlgeschlagen' : null;
 
-  // Helper to update data
+  // Helper to update data - use mutation.mutate directly for stable reference
   const updateData = useCallback((updater: (prev: AppData) => AppData) => {
     const currentData = queryClient.getQueryData<AppData>(QUERY_KEY) || DEFAULT_DATA;
     const newData = updater(currentData);
     mutation.mutate(newData);
-  }, [queryClient, mutation]);
+  }, [queryClient, mutation.mutate]);
 
   // Profile
   const updateProfile = useCallback((profile: Partial<AppData['profile']>) => {
