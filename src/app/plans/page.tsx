@@ -8,11 +8,11 @@ import Card from '@/components/Card';
 import Button from '@/components/Button';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useData } from '@/lib/data-store';
-import { getPlanTotals } from '@/lib/mealPlan';
+import { getPlanTotals, createEmptyPlan } from '@/lib/mealPlan';
 
 export default function PlansPage() {
   const router = useRouter();
-  const { data, deletePlan } = useData();
+  const { data, createPlan, deletePlan } = useData();
   const [plansParent] = useAutoAnimate();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<string | null>(null);
@@ -25,7 +25,9 @@ export default function PlansPage() {
   };
 
   const handleCreatePlan = () => {
-    router.push('/plans/new');
+    const newPlan = createEmptyPlan('Neuer Plan');
+    createPlan(newPlan);
+    router.push(`/plans/${newPlan.id}`);
   };
 
   const handleDeletePlan = (planId: string) => {
