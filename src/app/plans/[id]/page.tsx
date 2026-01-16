@@ -225,64 +225,48 @@ export default function PlanEditorPage() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [selectedImportMeals, setSelectedImportMeals] = useState<Set<string>>(new Set());
   const [mealsParent] = useAutoAnimate();
-  const initializedRef = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentPlanIdRef = useRef<string | null>(null);
 
-  // Get other plans for import (exclude current plan)
-  const otherPlans = Object.values(data.mealPlans).filter(p => p.id !== planId);
+  // Get other plans for import (exclude current editing plan)
+  const otherPlans = Object.values(data.mealPlans).filter(p =>
+    editingPlan ? p.id !== editingPlan.id : p.id !== planId
+  );
 
-  // Track the created plan ID (for new plans that haven't been persisted yet)
-  const createdPlanIdRef = useRef<string | null>(null);
-  const lastPlanIdRef = useRef(planId);
-
-  // Initialize plan when planId changes
+  // Initialize plan once when component mounts or planId changes
   useEffect(() => {
-    // Only reset when planId actually changes
-    if (lastPlanIdRef.current !== planId) {
-      initializedRef.current = false;
-      createdPlanIdRef.current = null;
-      lastPlanIdRef.current = planId;
-    }
-
-    // Don't re-initialize if already done
-    if (initializedRef.current) return;
-
     if (isNew) {
-      const newPlan = createEmptyPlan('Neuer Plan');
-      setEditingPlan(newPlan);
-      createdPlanIdRef.current = newPlan.id;
-      initializedRef.current = true;
+      // Create new plan only once
+      if (!currentPlanIdRef.current) {
+        const newPlan = createEmptyPlan('Neuer Plan');
+        currentPlanIdRef.current = newPlan.id;
+        setEditingPlan(newPlan);
+      }
     } else if (data.mealPlans[planId]) {
-      setEditingPlan(clonePlan(data.mealPlans[planId]));
-      setExpandedMeals(new Set(data.mealPlans[planId].meals.map(m => m.id)));
-      initializedRef.current = true;
+      // Load existing plan only if we haven't already or if planId changed
+      if (currentPlanIdRef.current !== planId) {
+        currentPlanIdRef.current = planId;
+        setEditingPlan(clonePlan(data.mealPlans[planId]));
+        setExpandedMeals(new Set(data.mealPlans[planId].meals.map(m => m.id)));
+      }
     }
-  }, [planId, isNew, data.mealPlans]);
+  }, [isNew, planId, data.mealPlans]);
 
-  // Track if current plan exists in data store
-  const planExistsRef = useRef(!isNew);
+  // Auto-save with debounce - simple and clean
   useEffect(() => {
-    if (editingPlan) {
-      planExistsRef.current = !!data.mealPlans[editingPlan.id];
-    }
-  }, [data.mealPlans, editingPlan]);
+    if (!editingPlan) return;
 
-  // Auto-save with debounce
-  useEffect(() => {
-    if (!editingPlan || !initializedRef.current) return;
-
-    // Clear previous timeout
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // Debounce save by 500ms
     saveTimeoutRef.current = setTimeout(() => {
-      if (planExistsRef.current) {
+      // Check if plan exists in store
+      const exists = !!data.mealPlans[editingPlan.id];
+      if (exists) {
         updatePlan(editingPlan);
       } else {
         createPlan(editingPlan);
-        planExistsRef.current = true;
       }
     }, 500);
 
@@ -291,7 +275,7 @@ export default function PlanEditorPage() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [editingPlan, createPlan, updatePlan]);
+  }, [editingPlan, createPlan, updatePlan, data.mealPlans]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import AuthGuard from './AuthGuard';
 import BottomNav from './BottomNav';
 import Sidebar from './Sidebar';
+import { QueryProvider } from '@/lib/query-provider';
 import { DataProvider } from '@/lib/data-store';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -16,6 +17,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthGuard>
+      <QueryProvider>
       <DataProvider>
         {/* Desktop Layout */}
         <div className="hidden lg:flex min-h-screen">
@@ -35,6 +37,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <BottomNav />
         </div>
       </DataProvider>
+      </QueryProvider>
     </AuthGuard>
   );
 }
