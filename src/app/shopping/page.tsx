@@ -4,59 +4,61 @@ import { useState, useMemo } from 'react';
 import { Check, Minus, Plus, RotateCcw, ChevronDown, ChevronUp, Home } from 'lucide-react';
 import Card from '@/components/Card';
 import { useData } from '@/lib/data-store';
-import { MealPlan, MealItem, getItemTotals } from '@/lib/mealPlan';
+import { getItemTotals } from '@/lib/mealPlan';
 
 interface AggregatedItem {
   name: string;
   totalQuantity: number;
   unit: string;
-  sources: { planName: string; quantity: number; perDay: number }[];
-  caloriesPer: number;
-  proteinPer: number;
+  sources: { planName: string; totalQty: number; perDay: number; unit: string }[];
+  isGeneric: boolean; // Items like "Protein", "Kohlenhydrate" that need specification
 }
 
-interface PackSuggestion {
-  packSize: number;
-  packUnit: string;
-  packsNeeded: number;
-  remainder: number;
-}
+// Items that are generic categories, not specific products
+const GENERIC_ITEMS = ['protein', 'kohlenhydrate', 'beilage'];
 
-// Common pack sizes for different item types
-const PACK_SIZES: Record<string, { size: number; unit: string }[]> = {
-  'eier': [{ size: 10, unit: 'Stück' }, { size: 6, unit: 'Stück' }],
-  'toast': [{ size: 10, unit: 'Scheiben' }],
-  'sandwiches': [{ size: 6, unit: 'Stück' }],
-  'default_g': [{ size: 500, unit: 'g' }, { size: 1000, unit: 'g' }],
-  'default_ml': [{ size: 1000, unit: 'ml' }],
+// Items to exclude from shopping (supplements, etc.)
+const EXCLUDED_ITEMS = ['omega-3', 'omega3', 'supplement', 'vitamin'];
+
+// Pack sizes for specific items
+const PACK_SIZES: Record<string, { size: number; unit: string; label: string }> = {
+  'eier': { size: 10, unit: 'Stück', label: '10er Pack' },
+  'magerquark': { size: 500, unit: 'g', label: '500g Becher' },
+  'skyr': { size: 450, unit: 'g', label: '450g Becher' },
+  'milch': { size: 1000, unit: 'ml', label: '1L' },
+  'exquisa': { size: 200, unit: 'g', label: '200g Pack' },
+  'hinterkochschinken': { size: 100, unit: 'g', label: '100g Pack' },
+  'backschinken': { size: 100, unit: 'g', label: '100g Pack' },
+  'toast': { size: 500, unit: 'g', label: 'Packung' },
+  'whey': { size: 1000, unit: 'g', label: '1kg Dose' },
 };
 
-function getPackSuggestion(name: string, quantity: number, unit: string): PackSuggestion | null {
+function getPackInfo(name: string, quantity: number, unit: string): { packs: number; label: string } | null {
   const nameLower = name.toLowerCase();
 
-  let packOptions = PACK_SIZES['default_' + unit] || null;
-
-  // Check for specific items
-  for (const [key, sizes] of Object.entries(PACK_SIZES)) {
+  for (const [key, pack] of Object.entries(PACK_SIZES)) {
     if (nameLower.includes(key)) {
-      packOptions = sizes;
-      break;
+      if (pack.unit === unit || (pack.unit === 'Stück' && unit === 'Stück')) {
+        const packs = Math.ceil(quantity / pack.size);
+        return { packs, label: pack.label };
+      }
     }
   }
 
-  if (!packOptions || packOptions.length === 0) return null;
+  return null;
+}
 
-  // Find best pack size
-  const pack = packOptions[0];
-  const packsNeeded = Math.ceil(quantity / pack.size);
-  const remainder = (packsNeeded * pack.size) - quantity;
-
-  return {
-    packSize: pack.size,
-    packUnit: pack.unit,
-    packsNeeded,
-    remainder,
-  };
+function formatQuantity(qty: number, unit: string): string {
+  if (unit === 'g' && qty >= 1000) {
+    return `${(qty / 1000).toFixed(1)}kg`;
+  }
+  if (unit === 'ml' && qty >= 1000) {
+    return `${(qty / 1000).toFixed(1)}L`;
+  }
+  if (unit === 'Stück' || unit === 'Portion') {
+    return `${qty}×`;
+  }
+  return `${qty}${unit}`;
 }
 
 export default function ShoppingPage() {
@@ -103,17 +105,30 @@ export default function ShoppingPage() {
 
       for (const meal of plan.meals) {
         for (const item of meal.items) {
-          // Handle alternatives - just use main item for shopping
-          const key = item.name.toLowerCase();
+          const nameLower = item.name.toLowerCase();
+
+          // Skip excluded items
+          if (EXCLUDED_ITEMS.some(ex => nameLower.includes(ex))) continue;
+
+          const key = nameLower;
           const existing = itemMap.get(key);
+          const isGeneric = GENERIC_ITEMS.some(g => nameLower.includes(g));
 
           if (existing) {
             existing.totalQuantity += item.quantity * days;
-            existing.sources.push({
-              planName: plan.name,
-              quantity: item.quantity * days,
-              perDay: item.quantity,
-            });
+            // Check if this plan is already in sources
+            const existingSource = existing.sources.find(s => s.planName === plan.name);
+            if (existingSource) {
+              existingSource.totalQty += item.quantity * days;
+              existingSource.perDay += item.quantity;
+            } else {
+              existing.sources.push({
+                planName: plan.name,
+                totalQty: item.quantity * days,
+                perDay: item.quantity,
+                unit: item.unit,
+              });
+            }
           } else {
             itemMap.set(key, {
               name: item.name,
@@ -121,18 +136,23 @@ export default function ShoppingPage() {
               unit: item.unit,
               sources: [{
                 planName: plan.name,
-                quantity: item.quantity * days,
+                totalQty: item.quantity * days,
                 perDay: item.quantity,
+                unit: item.unit,
               }],
-              caloriesPer: item.caloriesPer,
-              proteinPer: item.proteinPer,
+              isGeneric,
             });
           }
         }
       }
     }
 
-    return Array.from(itemMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    // Sort: generic items first (need attention), then alphabetically
+    return Array.from(itemMap.values()).sort((a, b) => {
+      if (a.isGeneric && !b.isGeneric) return -1;
+      if (!a.isGeneric && b.isGeneric) return 1;
+      return a.name.localeCompare(b.name);
+    });
   }, [plans, planDays]);
 
   // Calculate final shopping list (minus what's at home)
@@ -140,13 +160,13 @@ export default function ShoppingPage() {
     return aggregatedItems.map(item => {
       const homeQty = atHome[item.name.toLowerCase()] || 0;
       const needed = Math.max(0, item.totalQuantity - homeQty);
-      const pack = getPackSuggestion(item.name, needed, item.unit);
+      const packInfo = getPackInfo(item.name, needed, item.unit);
 
       return {
         ...item,
         needed,
         homeQty,
-        pack,
+        packInfo,
       };
     }).filter(item => item.needed > 0);
   }, [aggregatedItems, atHome]);
@@ -237,9 +257,9 @@ export default function ShoppingPage() {
             <div className="flex items-center gap-2">
               <Home size={16} className="text-zinc-500" />
               <span className="text-sm font-medium text-zinc-400">Schon zuhause?</span>
-              {Object.keys(atHome).length > 0 && (
+              {Object.values(atHome).filter(v => v > 0).length > 0 && (
                 <span className="text-xs bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-500">
-                  {Object.keys(atHome).length} Items
+                  {Object.values(atHome).filter(v => v > 0).length} Items
                 </span>
               )}
             </div>
@@ -253,6 +273,7 @@ export default function ShoppingPage() {
               </p>
               {aggregatedItems.map(item => {
                 const homeQty = atHome[item.name.toLowerCase()] || 0;
+                const step = item.unit === 'g' || item.unit === 'ml' ? 50 : 1;
                 return (
                   <div key={item.name} className="flex items-center justify-between py-2">
                     <span className="text-sm text-zinc-300 truncate flex-1 mr-4">{item.name}</span>
@@ -260,7 +281,7 @@ export default function ShoppingPage() {
                       <button
                         onClick={() => setAtHome(h => ({
                           ...h,
-                          [item.name.toLowerCase()]: Math.max(0, homeQty - (item.unit === 'g' || item.unit === 'ml' ? 50 : 1))
+                          [item.name.toLowerCase()]: Math.max(0, homeQty - step)
                         }))}
                         className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
                         disabled={homeQty === 0}
@@ -268,12 +289,12 @@ export default function ShoppingPage() {
                         <Minus size={12} className={homeQty === 0 ? 'text-zinc-600' : ''} />
                       </button>
                       <span className="w-16 text-center text-sm font-mono">
-                        {homeQty > 0 ? `${homeQty}${item.unit === 'Stück' || item.unit === 'Portion' ? '' : item.unit}` : '–'}
+                        {homeQty > 0 ? formatQuantity(homeQty, item.unit) : '–'}
                       </span>
                       <button
                         onClick={() => setAtHome(h => ({
                           ...h,
-                          [item.name.toLowerCase()]: homeQty + (item.unit === 'g' || item.unit === 'ml' ? 50 : 1)
+                          [item.name.toLowerCase()]: homeQty + step
                         }))}
                         className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
                       >
@@ -319,7 +340,7 @@ export default function ShoppingPage() {
                   onClick={() => toggleItem(item.name)}
                   className={`flex items-start gap-3 p-3 -mx-1 rounded-lg cursor-pointer transition-all ${
                     isChecked ? 'bg-emerald-500/5' : 'hover:bg-zinc-800/50'
-                  }`}
+                  } ${item.isGeneric && !isChecked ? 'border-l-2 border-amber-500/50' : ''}`}
                 >
                   <div className={`w-5 h-5 mt-0.5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                     isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-700'
@@ -330,23 +351,28 @@ export default function ShoppingPage() {
                     <div className="flex items-baseline justify-between gap-2">
                       <span className={`font-medium ${isChecked ? 'line-through text-zinc-500' : ''}`}>
                         {item.name}
+                        {item.isGeneric && !isChecked && (
+                          <span className="ml-2 text-xs text-amber-500/70">(wählen)</span>
+                        )}
                       </span>
                       <span className={`font-mono text-sm flex-shrink-0 ${
                         isChecked ? 'text-zinc-600' : 'text-emerald-500'
                       }`}>
-                        {item.pack
-                          ? `${item.pack.packsNeeded}× ${item.pack.packSize}${item.pack.packUnit === item.unit ? '' : ' ' + item.pack.packUnit}`
-                          : `${item.needed}${item.unit === 'Stück' || item.unit === 'Portion' ? '×' : item.unit}`
+                        {item.packInfo
+                          ? `${item.packInfo.packs}× ${item.packInfo.label}`
+                          : formatQuantity(item.needed, item.unit)
                         }
                       </span>
                     </div>
                     <p className={`text-xs ${isChecked ? 'text-zinc-600' : 'text-zinc-500'}`}>
-                      {item.needed}{item.unit === 'Stück' || item.unit === 'Portion' ? ' Stück' : item.unit} benötigt
-                      {item.homeQty > 0 && ` (${item.homeQty} zuhause)`}
+                      {formatQuantity(item.needed, item.unit).replace('×', ' Stück')} benötigt
+                      {item.homeQty > 0 && ` (${formatQuantity(item.homeQty, item.unit)} zuhause)`}
                     </p>
                     {!isChecked && item.sources.length > 0 && (
                       <p className="text-xs text-zinc-600 mt-1">
-                        {item.sources.map(s => `${s.perDay}×/Tag ${s.planName}`).join(' · ')}
+                        {item.sources.map(s =>
+                          `${formatQuantity(s.perDay, s.unit)}/Tag ${s.planName}`
+                        ).join(' · ')}
                       </p>
                     )}
                   </div>
