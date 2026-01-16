@@ -6,6 +6,7 @@ import BottomNav from './BottomNav';
 import Sidebar from './Sidebar';
 import { QueryProvider } from '@/lib/query-provider';
 import { DataProvider } from '@/lib/data-store';
+import { ServiceWorkerRegistration } from './ServiceWorkerRegistration';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,6 +18,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthGuard>
+      <ServiceWorkerRegistration />
       <QueryProvider>
       <DataProvider>
         {/* Desktop Layout */}
