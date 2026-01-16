@@ -43,6 +43,7 @@ export default function TodayPage() {
     getDayOverrides,
     setDayOverride,
     ensureDaySnapshot,
+    getChecklistItems,
   } = useData();
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -65,10 +66,10 @@ export default function TodayPage() {
   // Get extra calories for selected date
   const extraCalories = data.extraCalories?.[selectedDateStr] || 0;
 
-  // Get checked items for selected date
+  // Get checked items for selected date and current plan
   const checkedItems = useMemo(() => {
-    return new Set(data.checklist[selectedDateStr] || []);
-  }, [data.checklist, selectedDateStr]);
+    return new Set(getChecklistItems(selectedDateStr));
+  }, [getChecklistItems, selectedDateStr]);
 
   const handleToggle = (itemId: string) => {
     // Ensure snapshot exists when tracking starts
@@ -80,7 +81,7 @@ export default function TodayPage() {
     // Ensure snapshot exists when tracking starts
     ensureDaySnapshot(selectedDateStr);
     const mealItemIds = meal.items.map(i => i.id);
-    const currentItems = data.checklist[selectedDateStr] || [];
+    const currentItems = getChecklistItems(selectedDateStr);
     const allChecked = mealItemIds.every(id => currentItems.includes(id));
 
     if (allChecked) {
@@ -215,14 +216,21 @@ export default function TodayPage() {
     setShowDayExportMenu(false);
   };
 
-  // Calculate streak
+  // Calculate streak - uses each day's plan and checklist
   const streak = useMemo(() => {
-    if (!plan) return 0;
     let count = 0;
-    const totalItemsNeeded = plan.meals.reduce((sum, meal) => sum + meal.items.length, 0);
     for (let i = 0; i < 365; i++) {
       const date = format(subDays(new Date(), i), 'yyyy-MM-dd');
-      const dayChecked = data.checklist[date] || [];
+      // Get the plan that was used on this day
+      const dayPlanId = getDayPlanId(date);
+      const dayChecked = getChecklistItems(date, dayPlanId);
+      // Get the day's plan to count items
+      const dayPlan = getDayPlan(date);
+      if (!dayPlan) {
+        if (i > 0) break;
+        continue;
+      }
+      const totalItemsNeeded = dayPlan.meals.reduce((sum, meal) => sum + meal.items.length, 0);
       if (dayChecked.length >= totalItemsNeeded * 0.8) {
         count++;
       } else if (i > 0) {
@@ -230,7 +238,7 @@ export default function TodayPage() {
       }
     }
     return count;
-  }, [data.checklist, plan]);
+  }, [getDayPlanId, getChecklistItems, getDayPlan]);
 
   const completedCount = checkedItems.size;
   const totalItems = plan?.meals.reduce((sum, meal) => sum + meal.items.length, 0) || 0;
