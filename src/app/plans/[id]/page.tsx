@@ -31,7 +31,6 @@ import {
   MealPlan,
   Meal,
   MealItem,
-  createEmptyPlan,
   createEmptyMeal,
   createEmptyItem,
   clonePlan,
@@ -211,9 +210,8 @@ export default function PlanEditorPage() {
   const router = useRouter();
   const params = useParams();
   const planId = params.id as string;
-  const isNew = planId === 'new';
 
-  const { data, createPlan, updatePlan, isSyncing, lastSyncError } = useData();
+  const { data, updatePlan, isSyncing, lastSyncError } = useData();
   const [editingPlan, setEditingPlan] = useState<MealPlan | null>(null);
   const [expandedMeals, setExpandedMeals] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -226,50 +224,31 @@ export default function PlanEditorPage() {
   const [selectedImportMeals, setSelectedImportMeals] = useState<Set<string>>(new Set());
   const [mealsParent] = useAutoAnimate();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const currentPlanIdRef = useRef<string | null>(null);
-  const planCreatedRef = useRef(false);
+  const loadedPlanIdRef = useRef<string | null>(null);
 
   // Get other plans for import (exclude current editing plan)
-  const otherPlans = Object.values(data.mealPlans).filter(p =>
-    editingPlan ? p.id !== editingPlan.id : p.id !== planId
-  );
+  const otherPlans = Object.values(data.mealPlans).filter(p => p.id !== planId);
 
-  // Initialize plan once when component mounts or planId changes
+  // Load plan from store when planId changes
   useEffect(() => {
-    if (isNew) {
-      // Create new plan only once
-      if (!currentPlanIdRef.current) {
-        const newPlan = createEmptyPlan('Neuer Plan');
-        currentPlanIdRef.current = newPlan.id;
-        planCreatedRef.current = false; // Not yet saved to store
-        setEditingPlan(newPlan);
-      }
-    } else if (data.mealPlans[planId]) {
-      // Load existing plan only if we haven't already or if planId changed
-      if (currentPlanIdRef.current !== planId) {
-        currentPlanIdRef.current = planId;
-        planCreatedRef.current = true; // Exists in store
-        setEditingPlan(clonePlan(data.mealPlans[planId]));
-        setExpandedMeals(new Set(data.mealPlans[planId].meals.map(m => m.id)));
-      }
+    const plan = data.mealPlans[planId];
+    if (plan && loadedPlanIdRef.current !== planId) {
+      loadedPlanIdRef.current = planId;
+      setEditingPlan(clonePlan(plan));
+      setExpandedMeals(new Set(plan.meals.map(m => m.id)));
     }
-  }, [isNew, planId, data.mealPlans]);
+  }, [planId, data.mealPlans]);
 
-  // Auto-save with debounce - only reacts to editingPlan changes
+  // Auto-save with debounce
   useEffect(() => {
-    if (!editingPlan) return;
+    if (!editingPlan || loadedPlanIdRef.current !== planId) return;
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
     saveTimeoutRef.current = setTimeout(() => {
-      if (planCreatedRef.current) {
-        updatePlan(editingPlan);
-      } else {
-        createPlan(editingPlan);
-        planCreatedRef.current = true;
-      }
+      updatePlan(editingPlan);
     }, 500);
 
     return () => {
@@ -277,8 +256,7 @@ export default function PlanEditorPage() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingPlan]);
+  }, [editingPlan, planId, updatePlan]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -610,7 +588,7 @@ export default function PlanEditorPage() {
           <ChevronLeft size={20} />
         </button>
         <div className="flex-1">
-          <p className="text-zinc-500 text-sm">{isNew ? 'Neuer Plan' : 'Plan bearbeiten'}</p>
+          <p className="text-zinc-500 text-sm">Plan bearbeiten</p>
           <input
             type="text"
             value={editingPlan.name}
