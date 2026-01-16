@@ -40,6 +40,7 @@ export interface AppData {
 
 const CURRENT_MIGRATION_VERSION = 5;
 const LOCAL_STORAGE_KEY = 'cutboard_all_data';
+const BLOB_URL_KEY = 'cutboard_blob_url';
 const QUERY_KEY = ['appData'];
 
 const DEFAULT_DATA: AppData = {
@@ -168,16 +169,39 @@ function setLocalData(data: AppData): void {
   }
 }
 
+// Blob URL cache helpers
+function getCachedBlobUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(BLOB_URL_KEY);
+}
+
+function setCachedBlobUrl(url: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(BLOB_URL_KEY, url);
+}
+
 // API functions
 async function fetchData(): Promise<AppData> {
   // First try localStorage for instant load
   const localData = getLocalData();
 
   try {
-    const response = await fetch('/api/sync');
+    // Pass cached blob URL to avoid expensive list() operation
+    const cachedBlobUrl = getCachedBlobUrl();
+    const url = cachedBlobUrl
+      ? `/api/sync?blobUrl=${encodeURIComponent(cachedBlobUrl)}`
+      : '/api/sync';
+
+    const response = await fetch(url);
     if (response.ok) {
       const serverData = await response.json();
       if (serverData) {
+        // Cache the blob URL for future requests
+        if (serverData._blobUrl) {
+          setCachedBlobUrl(serverData._blobUrl);
+          delete serverData._blobUrl;
+        }
+
         const migrated = migrateData(serverData);
 
         // Compare timestamps - use newer data
@@ -221,6 +245,12 @@ async function saveData(data: AppData): Promise<AppData> {
   }
 
   const result = await response.json();
+
+  // Cache blob URL for future GET requests
+  if (result.url) {
+    setCachedBlobUrl(result.url);
+  }
+
   const finalData = { ...dataWithTimestamp, lastSync: result.lastSync };
   setLocalData(finalData);
 

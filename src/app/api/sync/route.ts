@@ -9,7 +9,7 @@ async function getSession() {
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSession();
 
   if (!session?.user?.id) {
@@ -19,23 +19,59 @@ export async function GET() {
   const userId = session.user.id;
   const dataPath = `users/${userId}/data.json`;
 
-  try {
-    const { blobs } = await list({ prefix: `users/${userId}` });
-    const dataBlob = blobs.find(b => b.pathname === dataPath);
+  // Check if client provided a cached blob URL to avoid list() call
+  const { searchParams } = new URL(request.url);
+  const cachedUrl = searchParams.get('blobUrl');
 
-    if (!dataBlob) {
-      return NextResponse.json(null);
+  try {
+    let blobUrl: string | null = null;
+
+    // Try cached URL first (avoids expensive list() operation)
+    if (cachedUrl) {
+      // Validate URL belongs to this user
+      if (cachedUrl.includes(dataPath)) {
+        blobUrl = cachedUrl;
+      }
+    }
+
+    // Fallback to list() only if no cached URL (first sync or cache miss)
+    if (!blobUrl) {
+      const { blobs } = await list({ prefix: `users/${userId}` });
+      const dataBlob = blobs.find(b => b.pathname === dataPath);
+      if (!dataBlob) {
+        return NextResponse.json(null);
+      }
+      blobUrl = dataBlob.url;
     }
 
     const cacheBuster = `?t=${Date.now()}`;
-    const response = await fetch(dataBlob.url + cacheBuster, {
+    const response = await fetch(blobUrl + cacheBuster, {
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     });
+
+    if (!response.ok) {
+      // Cached URL might be stale, fallback to list()
+      if (cachedUrl) {
+        const { blobs } = await list({ prefix: `users/${userId}` });
+        const dataBlob = blobs.find(b => b.pathname === dataPath);
+        if (!dataBlob) {
+          return NextResponse.json(null);
+        }
+        const retryResponse = await fetch(dataBlob.url + cacheBuster, {
+          cache: 'no-store',
+        });
+        const data = await retryResponse.json();
+        return NextResponse.json({ ...data, _blobUrl: dataBlob.url });
+      }
+      return NextResponse.json(null);
+    }
+
     const data = await response.json();
-    return NextResponse.json(data);
+    // Include blob URL in response so client can cache it
+    return NextResponse.json({ ...data, _blobUrl: blobUrl });
   } catch (error) {
     console.error('Blob GET error:', error);
     return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 });
