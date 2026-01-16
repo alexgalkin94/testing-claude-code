@@ -225,50 +225,48 @@ export default function PlanEditorPage() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [selectedImportMeals, setSelectedImportMeals] = useState<Set<string>>(new Set());
   const [mealsParent] = useAutoAnimate();
-  const initializedRef = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentPlanIdRef = useRef<string | null>(null);
 
-  // Get other plans for import (exclude current plan)
-  const otherPlans = Object.values(data.mealPlans).filter(p => p.id !== planId);
+  // Get other plans for import (exclude current editing plan)
+  const otherPlans = Object.values(data.mealPlans).filter(p =>
+    editingPlan ? p.id !== editingPlan.id : p.id !== planId
+  );
 
-  // Track if plan has been persisted (for new plans)
-  const persistedRef = useRef(!isNew);
-
-  // Initialize plan when planId changes
+  // Initialize plan once when component mounts or planId changes
   useEffect(() => {
-    // Reset refs when planId changes
-    initializedRef.current = false;
-    persistedRef.current = !isNew;
-
     if (isNew) {
-      const newPlan = createEmptyPlan('Neuer Plan');
-      setEditingPlan(newPlan);
-      initializedRef.current = true;
+      // Create new plan only once
+      if (!currentPlanIdRef.current) {
+        const newPlan = createEmptyPlan('Neuer Plan');
+        currentPlanIdRef.current = newPlan.id;
+        setEditingPlan(newPlan);
+      }
     } else if (data.mealPlans[planId]) {
-      setEditingPlan(clonePlan(data.mealPlans[planId]));
-      setExpandedMeals(new Set(data.mealPlans[planId].meals.map(m => m.id)));
-      initializedRef.current = true;
+      // Load existing plan only if we haven't already or if planId changed
+      if (currentPlanIdRef.current !== planId) {
+        currentPlanIdRef.current = planId;
+        setEditingPlan(clonePlan(data.mealPlans[planId]));
+        setExpandedMeals(new Set(data.mealPlans[planId].meals.map(m => m.id)));
+      }
     }
-  }, [planId, isNew, data.mealPlans]);
+  }, [isNew, planId, data.mealPlans]);
 
-  // Auto-save with debounce
+  // Auto-save with debounce - simple and clean
   useEffect(() => {
-    if (!editingPlan || !initializedRef.current) return;
+    if (!editingPlan) return;
 
-    // Clear previous timeout
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // Debounce save by 500ms
     saveTimeoutRef.current = setTimeout(() => {
-      if (!persistedRef.current) {
-        // First save for new plan - create it
-        createPlan(editingPlan);
-        persistedRef.current = true;
-      } else {
-        // Subsequent saves - update it
+      // Check if plan exists in store
+      const exists = !!data.mealPlans[editingPlan.id];
+      if (exists) {
         updatePlan(editingPlan);
+      } else {
+        createPlan(editingPlan);
       }
     }, 500);
 
@@ -277,7 +275,7 @@ export default function PlanEditorPage() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [editingPlan, createPlan, updatePlan]);
+  }, [editingPlan, createPlan, updatePlan, data.mealPlans]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
