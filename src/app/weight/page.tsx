@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { format, differenceInDays, addDays, subDays } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine } from 'recharts';
-import { Plus, TrendingDown, Zap, Info, X } from 'lucide-react';
+import { Plus, TrendingDown, Zap, Info, X, Download } from 'lucide-react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
@@ -51,6 +51,7 @@ export default function WeightPage() {
   const [newWeight, setNewWeight] = useState('');
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [showChartInfo, setShowChartInfo] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   // TDEE Calculation - must be before any early returns
   const tdeeTracking = useMemo(() => {
@@ -171,6 +172,86 @@ export default function WeightPage() {
     setShowForm(false);
   };
 
+  const exportProgress = async (formatType: 'json' | 'table' | 'text') => {
+    const sortedWeights = [...data.weights].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    const movingAvg = getMovingAverage(sortedWeights);
+    const latestWeight = sortedWeights[sortedWeights.length - 1]?.weight;
+    const firstWeight = sortedWeights[0]?.weight;
+    const totalLost = firstWeight && latestWeight ? firstWeight - latestWeight : 0;
+    const remaining = latestWeight ? latestWeight - data.profile.goalWeight : 0;
+
+    if (formatType === 'json') {
+      const exportData = {
+        profile: {
+          startWeight: data.profile.startWeight,
+          currentWeight: latestWeight || data.profile.currentWeight,
+          goalWeight: data.profile.goalWeight,
+          startDate: data.profile.startDate,
+          calorieTarget: data.profile.calorieTarget,
+          proteinTarget: data.profile.proteinTarget,
+          tdee: tdeeTracking.calculatedTdee || data.profile.tdee,
+          tdeeCalculated: !!tdeeTracking.calculatedTdee,
+          tdeeConfidence: tdeeTracking.tdeeConfidence,
+        },
+        progress: {
+          daysElapsed: tdeeTracking.daysElapsed,
+          totalLost: Math.round(totalLost * 10) / 10,
+          remaining: Math.round(remaining * 10) / 10,
+          weeklyTrend: tdeeTracking.weeklyTrend ? Math.round(tdeeTracking.weeklyTrend * 100) / 100 : null,
+        },
+        weights: sortedWeights.map((w, i) => ({
+          date: w.date,
+          weight: w.weight,
+          trend: movingAvg[i]?.avg || null,
+        })),
+      };
+      await navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
+    } else if (formatType === 'table') {
+      let table = 'Datum\tGewicht\tTrend\n';
+      sortedWeights.forEach((w, i) => {
+        table += `${w.date}\t${w.weight}\t${movingAvg[i]?.avg || '-'}\n`;
+      });
+      table += '\n--- Zusammenfassung ---\n';
+      table += `Startgewicht:\t${data.profile.startWeight} kg\n`;
+      table += `Aktuell:\t${latestWeight || '-'} kg\n`;
+      table += `Ziel:\t${data.profile.goalWeight} kg\n`;
+      table += `Verloren:\t${totalLost.toFixed(1)} kg\n`;
+      table += `Verbleibend:\t${remaining.toFixed(1)} kg\n`;
+      table += `Tage:\t${tdeeTracking.daysElapsed}\n`;
+      table += `TDEE:\t${tdeeTracking.calculatedTdee || data.profile.tdee} kcal\n`;
+      if (tdeeTracking.weeklyTrend) {
+        table += `Trend/Woche:\t-${tdeeTracking.weeklyTrend.toFixed(2)} kg\n`;
+      }
+      await navigator.clipboard.writeText(table);
+    } else {
+      let text = '📊 Fatloss Fortschritt\n\n';
+      text += `Start: ${data.profile.startWeight} kg (${format(new Date(data.profile.startDate), 'd. MMM yyyy', { locale: de })})\n`;
+      text += `Aktuell: ${latestWeight || '-'} kg\n`;
+      text += `Ziel: ${data.profile.goalWeight} kg\n`;
+      text += `Verloren: ${totalLost.toFixed(1)} kg\n`;
+      text += `Verbleibend: ${remaining.toFixed(1)} kg\n\n`;
+      text += `📅 Tag ${tdeeTracking.daysElapsed}\n`;
+      text += `⚡ TDEE: ${tdeeTracking.calculatedTdee || data.profile.tdee} kcal`;
+      if (tdeeTracking.calculatedTdee) {
+        text += ` (${tdeeTracking.tdeeConfidence === 'high' ? 'hohe' : tdeeTracking.tdeeConfidence === 'medium' ? 'mittlere' : 'niedrige'} Konfidenz)`;
+      }
+      text += '\n';
+      if (tdeeTracking.weeklyTrend) {
+        text += `📉 Trend: -${tdeeTracking.weeklyTrend.toFixed(2)} kg/Woche\n`;
+      }
+      text += `🎯 Kalorien: ${data.profile.calorieTarget} kcal\n`;
+      text += `💪 Protein: ${data.profile.proteinTarget}g\n\n`;
+      text += `Letzte 7 Einträge:\n`;
+      sortedWeights.slice(-7).forEach(w => {
+        text += `• ${format(new Date(w.date), 'd.M.', { locale: de })}: ${w.weight} kg\n`;
+      });
+      await navigator.clipboard.writeText(text);
+    }
+    setShowExportMenu(false);
+  };
+
   if (isLoading) {
     return (
       <div className="p-4 lg:p-8 lg:max-w-3xl animate-pulse space-y-4">
@@ -212,9 +293,27 @@ export default function WeightPage() {
           <p className="text-zinc-500 text-sm">Verfolge deinen Fortschritt</p>
           <h1 className="text-xl font-semibold tracking-tight">Gewicht</h1>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} size="sm">
-          <Plus size={16} className="mr-1" /> Eintragen
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+              title="Exportieren"
+            >
+              <Download size={18} />
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-10 py-1 min-w-[120px]">
+                <button onClick={() => exportProgress('text')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">Text</button>
+                <button onClick={() => exportProgress('table')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">Tabelle</button>
+                <button onClick={() => exportProgress('json')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">JSON</button>
+              </div>
+            )}
+          </div>
+          <Button onClick={() => setShowForm(!showForm)} size="sm">
+            <Plus size={16} className="mr-1" /> Eintragen
+          </Button>
+        </div>
       </div>
 
       {showForm && (
