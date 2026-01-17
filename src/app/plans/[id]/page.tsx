@@ -22,6 +22,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
+import { Drawer } from 'vaul';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
@@ -1080,76 +1081,81 @@ export default function PlanEditorPage() {
       </DragOverlay>
       </DndContext>
 
-      {/* Import Dialog */}
-      {showImportDialog && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-              <h2 className="text-lg font-semibold">Mahlzeiten importieren</h2>
-              <button
-                onClick={() => {
-                  setShowImportDialog(false);
-                  setSelectedImportMeals(new Set());
-                }}
-                className="p-2 text-zinc-400 hover:text-white"
-              >
-                <X size={20} />
-              </button>
-            </div>
+      {/* Import Sheet */}
+      <Drawer.Root
+        open={showImportDialog}
+        onOpenChange={(open) => {
+          setShowImportDialog(open);
+          if (!open) setSelectedImportMeals(new Set());
+        }}
+      >
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 bg-black/60 z-50" />
+          <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 outline-none max-h-[85vh] flex flex-col">
+            <div className="bg-zinc-900 rounded-t-2xl border-t border-zinc-800 flex flex-col flex-1 overflow-hidden">
+              <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-zinc-700 my-4" />
+              <Drawer.Title className="text-lg font-semibold text-white px-6 mb-4">
+                Mahlzeiten importieren
+              </Drawer.Title>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {otherPlans.length === 0 ? (
-                <p className="text-zinc-500 text-center py-8">Keine anderen Pläne vorhanden</p>
-              ) : (
-                otherPlans.map(plan => (
-                  <div key={plan.id}>
-                    <p className="text-sm text-zinc-400 mb-2">{plan.name}</p>
-                    <div className="space-y-1">
-                      {plan.meals.map(meal => {
-                        const key = `${plan.id}::${meal.id}`;
-                        const isSelected = selectedImportMeals.has(key);
-                        const mealTotals = getMealTotals(meal);
-                        return (
-                          <button
-                            key={meal.id}
-                            onClick={() => toggleImportMeal(key)}
-                            className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors ${
-                              isSelected
-                                ? 'bg-amber-500/20 border border-amber-500/50'
-                                : 'bg-zinc-800/50 hover:bg-zinc-800 border border-transparent'
-                            }`}
-                          >
-                            <div className="text-zinc-400">
-                              <MealIcon icon={meal.icon} size={18} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate">{meal.name}</p>
-                              <p className="text-xs text-zinc-500">
-                                {mealTotals.calories} kcal · {mealTotals.protein}g P · {meal.items.length} Items
-                              </p>
-                            </div>
-                            {isSelected && (
-                              <Check size={18} className="text-amber-500 shrink-0" />
-                            )}
-                          </button>
-                        );
-                      })}
+              <div className="flex-1 overflow-y-auto px-6 space-y-4">
+                {otherPlans.length === 0 ? (
+                  <p className="text-zinc-500 text-center py-8 text-[15px]">Keine anderen Pläne vorhanden</p>
+                ) : (
+                  otherPlans.map(plan => (
+                    <div key={plan.id}>
+                      <p className="text-[13px] text-zinc-400 mb-2">{plan.name}</p>
+                      <div className="space-y-1">
+                        {plan.meals.map(meal => {
+                          const key = `${plan.id}::${meal.id}`;
+                          const isSelected = selectedImportMeals.has(key);
+                          const mealTotals = getMealTotals(meal);
+                          return (
+                            <button
+                              key={meal.id}
+                              onClick={() => toggleImportMeal(key)}
+                              className={`w-full flex items-center gap-3 p-4 min-h-[44px] rounded-xl text-left transition-colors ${
+                                isSelected
+                                  ? 'bg-amber-500/20 border border-amber-500/50'
+                                  : 'bg-zinc-800/50 hover:bg-zinc-800 border border-transparent'
+                              }`}
+                            >
+                              <div className="text-zinc-400">
+                                <MealIcon icon={meal.icon} size={20} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[17px] font-medium truncate">{meal.name}</p>
+                                <p className="text-[13px] text-zinc-500">
+                                  {mealTotals.calories} kcal · {mealTotals.protein}g P · {meal.items.length} Items
+                                </p>
+                              </div>
+                              {isSelected && (
+                                <Check size={20} className="text-amber-500 shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
+                  ))
+                )}
+              </div>
 
-            {selectedImportMeals.size > 0 && (
-              <div className="p-4 border-t border-zinc-800">
-                <Button onClick={importSelectedMeals} className="w-full">
-                  {selectedImportMeals.size} Mahlzeit{selectedImportMeals.size > 1 ? 'en' : ''} importieren
+              <div className="p-6 pt-4">
+                <Button
+                  onClick={importSelectedMeals}
+                  className="w-full"
+                  disabled={selectedImportMeals.size === 0}
+                >
+                  {selectedImportMeals.size > 0
+                    ? `${selectedImportMeals.size} Mahlzeit${selectedImportMeals.size > 1 ? 'en' : ''} importieren`
+                    : 'Mahlzeiten auswählen'}
                 </Button>
               </div>
-            )}
-          </Card>
-        </div>
-      )}
+            </div>
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
 
       <ConfirmDialog
         open={deleteMealDialog.open}
