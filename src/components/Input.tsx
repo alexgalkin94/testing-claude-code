@@ -28,7 +28,8 @@ export default function Input({
   return (
     <div className={className}>
       {label && (
-        <label className="block text-xs sm:text-sm text-zinc-400 mb-1.5">{label}</label>
+        // Apple HIG: 13pt for labels/captions
+        <label className="block text-[13px] text-zinc-400 mb-2">{label}</label>
       )}
       <div className="relative">
         <input
@@ -40,10 +41,11 @@ export default function Input({
           min={min}
           max={max}
           step={step}
-          className="w-full max-w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 transition-colors [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-50"
+          // Apple HIG: 17pt text, 44pt minimum height
+          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-[17px] min-h-[44px] text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 transition-colors [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-50"
         />
         {suffix && (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 text-[15px]">
             {suffix}
           </span>
         )}

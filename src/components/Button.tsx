@@ -17,7 +17,7 @@ export default function Button({
   disabled = false,
   type = 'button',
 }: ButtonProps) {
-  const baseStyles = 'font-medium rounded-lg flex items-center justify-center active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed';
+  const baseStyles = 'font-medium rounded-xl flex items-center justify-center active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed';
 
   const variants = {
     primary: 'bg-white text-black hover:bg-zinc-200',
@@ -26,10 +26,11 @@ export default function Button({
     ghost: 'bg-transparent hover:bg-zinc-800 text-zinc-400',
   };
 
+  // Apple HIG: 44pt minimum touch target, 17pt text
   const sizes = {
-    sm: 'px-3 py-1.5 text-xs',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-5 py-2.5 text-sm',
+    sm: 'px-4 py-2 text-[15px] min-h-[36px]',        // Compact: 15pt, 36px height
+    md: 'px-5 py-3 text-[17px] min-h-[44px]',        // Standard: 17pt, 44px min
+    lg: 'px-6 py-3.5 text-[17px] min-h-[50px]',      // Large: 17pt, 50px height
   };
 
   return (
