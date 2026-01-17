@@ -265,7 +265,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     queryKey: QUERY_KEY,
     queryFn: fetchData,
     initialData: () => getLocalData() || undefined,
-    staleTime: 1000 * 60, // 1 minute
   });
 
   const data = queryData || DEFAULT_DATA;
@@ -277,16 +276,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: QUERY_KEY });
 
-      // Snapshot previous value
+      // Snapshot previous value for rollback
       const previousData = queryClient.getQueryData<AppData>(QUERY_KEY);
-
-      // Optimistically update
-      queryClient.setQueryData(QUERY_KEY, newData);
-      setLocalData(newData);
 
       return { previousData };
     },
-    onError: (err, newData, context) => {
+    onSuccess: (result) => {
+      // Update with server-confirmed timestamp
+      queryClient.setQueryData(QUERY_KEY, result);
+      setLocalData(result);
+    },
+    onError: (err, _newData, context) => {
       // Rollback on error
       if (context?.previousData) {
         queryClient.setQueryData(QUERY_KEY, context.previousData);
@@ -294,18 +294,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
       console.error('Sync error:', err);
     },
-    // No onSettled - optimistic update is enough, no refetch needed
   });
 
   const isSyncing = mutation.isPending;
   const lastSyncError = mutation.isError ? 'Sync fehlgeschlagen' : null;
 
-  // Helper to update data - use mutation.mutate directly for stable reference
+  // Helper to update data - updates cache synchronously before mutation
   const updateData = useCallback((updater: (prev: AppData) => AppData) => {
+    // Read current data from cache
     const currentData = queryClient.getQueryData<AppData>(QUERY_KEY) || DEFAULT_DATA;
     const newData = updater(currentData);
+
+    // Update cache and localStorage SYNCHRONOUSLY before mutate
+    // This prevents race conditions when rapid updates occur
+    queryClient.setQueryData(QUERY_KEY, newData);
+    setLocalData(newData);
+
+    // Then trigger the server sync
     mutation.mutate(newData);
-  }, [queryClient, mutation.mutate]);
+  }, [queryClient, mutation]);
 
   // Profile
   const updateProfile = useCallback((profile: Partial<AppData['profile']>) => {
