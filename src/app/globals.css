@@ -83,6 +83,11 @@ input:focus, button:focus {
   border-color: #52525b;
 }
 
+/* Remove focus outline from charts */
+.recharts-wrapper, .recharts-surface {
+  outline: none !important;
+}
+
 /* Selection */
 ::selection {
   background: #3f3f46;

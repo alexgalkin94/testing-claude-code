@@ -423,7 +423,7 @@ export default function WeightPage() {
 
       {/* Chart */}
       <Card className="mb-4">
-        <div className="flex justify-between items-start mb-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-4">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-medium text-zinc-400">Gewichtsverlauf</h3>
             <button
@@ -435,23 +435,23 @@ export default function WeightPage() {
             </button>
           </div>
           {/* Legend */}
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          <div className="flex gap-4 text-xs">
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-white"></div>
               <span className="text-zinc-500">Aktuell</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-4 h-0.5 bg-amber-500"></div>
+              <div className="w-3 h-0.5 bg-amber-500 rounded"></div>
               <span className="text-zinc-500">Trend</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-4 h-0.5 bg-emerald-500" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #22c55e 0, #22c55e 4px, transparent 4px, transparent 8px)' }}></div>
+              <div className="w-3 h-0.5 rounded" style={{ background: 'repeating-linear-gradient(90deg, #22c55e 0, #22c55e 2px, transparent 2px, transparent 4px)' }}></div>
               <span className="text-zinc-500">Erwartet</span>
             </div>
           </div>
         </div>
         {chartData.length > 0 ? (
-          <div className="h-48">
+          <div className="h-48 outline-none" tabIndex={-1}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
                 <XAxis
