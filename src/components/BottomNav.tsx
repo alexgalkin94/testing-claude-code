@@ -30,8 +30,12 @@ export default function BottomNav() {
   );
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/90 backdrop-blur-lg border-t border-zinc-800 pb-[env(safe-area-inset-bottom)]">
-      <div className="flex justify-around items-center h-[49px] max-w-lg mx-auto px-2">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/50"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
+      {/* 49pt = 49px content height (Apple HIG standard) */}
+      <div className="flex justify-around items-stretch h-[49px] max-w-lg mx-auto">
         {navItems.map(({ href, icon: Icon, label }) => {
           const isActive = pathname === href;
           return (
@@ -39,14 +43,14 @@ export default function BottomNav() {
               key={href}
               href={href}
               prefetch={true}
-              className={`flex flex-col items-center justify-center px-3 py-1 rounded-lg transition-colors active:scale-95 ${
-                isActive
-                  ? 'text-white'
-                  : 'text-zinc-500 active:text-zinc-300'
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors active:opacity-70 ${
+                isActive ? 'text-white' : 'text-zinc-500'
               }`}
             >
-              <Icon size={22} />
-              <span className="text-[10px] mt-0.5 font-medium">{label}</span>
+              {/* 25pt icon size per Apple HIG */}
+              <Icon size={25} strokeWidth={isActive ? 2 : 1.5} />
+              {/* 10pt SF Medium per Apple HIG */}
+              <span className="text-[10px] font-medium leading-none">{label}</span>
             </Link>
           );
         })}
