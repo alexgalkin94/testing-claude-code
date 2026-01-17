@@ -34,6 +34,12 @@ export interface AppData {
   dayPlanIds: { [date: string]: string };
   // Per-plan snapshots: { [date]: { [planId]: DaySnapshot } }
   daySnapshots: { [date: string]: { [planId: string]: DaySnapshot } };
+  // Shopping list state (synced across devices)
+  shopping: {
+    planDays: { [planId: string]: number };
+    atHome: { [itemId: string]: number };
+    checkedItems: string[];
+  };
   migrationVersion?: number;
   lastSync?: string;
 }
@@ -62,6 +68,7 @@ const DEFAULT_DATA: AppData = {
   mealPlans: {},
   dayPlanIds: {},
   daySnapshots: {},
+  shopping: { planDays: {}, atHome: {}, checkedItems: [] },
   migrationVersion: CURRENT_MIGRATION_VERSION,
 };
 
@@ -80,6 +87,70 @@ function isOldSnapshotFormat(snapshots: unknown): snapshots is { [date: string]:
   return firstValue && 'planId' in firstValue && 'meals' in firstValue;
 }
 
+// Merge two data objects - combines arrays, takes newer values for scalars
+function mergeData(local: AppData, server: AppData): AppData {
+  const merged: AppData = { ...server };
+
+  // Merge weights - combine and deduplicate by date, keep latest value per date
+  const weightMap = new Map<string, { date: string; weight: number }>();
+  for (const w of local.weights) weightMap.set(w.date, w);
+  for (const w of server.weights) weightMap.set(w.date, w);
+  merged.weights = Array.from(weightMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+  // Merge checklists - union of checked items per date/plan
+  merged.checklist = { ...server.checklist };
+  for (const [date, plans] of Object.entries(local.checklist || {})) {
+    if (!merged.checklist[date]) merged.checklist[date] = {};
+    for (const [planId, items] of Object.entries(plans)) {
+      const serverItems = merged.checklist[date]?.[planId] || [];
+      merged.checklist[date][planId] = [...new Set([...serverItems, ...items])];
+    }
+  }
+
+  // Merge extraCalories - take non-zero values
+  merged.extraCalories = { ...server.extraCalories };
+  for (const [date, cals] of Object.entries(local.extraCalories || {})) {
+    if (cals && (!merged.extraCalories[date] || merged.extraCalories[date] === 0)) {
+      merged.extraCalories[date] = cals;
+    }
+  }
+
+  // Merge dayPlanIds - prefer server but keep local if server is missing
+  merged.dayPlanIds = { ...local.dayPlanIds, ...server.dayPlanIds };
+
+  // Merge daySnapshots - prefer server but keep local if server is missing
+  merged.daySnapshots = { ...server.daySnapshots };
+  for (const [date, plans] of Object.entries(local.daySnapshots || {})) {
+    if (!merged.daySnapshots[date]) merged.daySnapshots[date] = {};
+    for (const [planId, snapshot] of Object.entries(plans)) {
+      if (!merged.daySnapshots[date][planId]) {
+        merged.daySnapshots[date][planId] = snapshot;
+      }
+    }
+  }
+
+  // Merge mealPlans - keep both, server wins on conflict
+  merged.mealPlans = { ...local.mealPlans, ...server.mealPlans };
+
+  // Merge shopping - union of checked items, max of quantities
+  const localShopping = local.shopping || DEFAULT_DATA.shopping;
+  const serverShopping = server.shopping || DEFAULT_DATA.shopping;
+  merged.shopping = {
+    planDays: { ...localShopping.planDays, ...serverShopping.planDays },
+    atHome: { ...localShopping.atHome },
+    checkedItems: [...new Set([...localShopping.checkedItems, ...serverShopping.checkedItems])],
+  };
+  // For atHome, take the max value (more conservative)
+  for (const [key, val] of Object.entries(serverShopping.atHome)) {
+    merged.shopping.atHome[key] = Math.max(merged.shopping.atHome[key] || 0, val);
+  }
+
+  // Use server's lastSync since it's the authoritative timestamp
+  merged.lastSync = server.lastSync;
+
+  return merged;
+}
+
 // Migration function
 function migrateData(data: Partial<AppData>): AppData {
   const today = new Date().toISOString().split('T')[0];
@@ -92,6 +163,7 @@ function migrateData(data: Partial<AppData>): AppData {
     dayPlanIds: data.dayPlanIds || {},
     checklist: {},
     daySnapshots: {},
+    shopping: data.shopping || DEFAULT_DATA.shopping,
   };
 
   const needsMigration = !data.migrationVersion || data.migrationVersion < CURRENT_MIGRATION_VERSION;
@@ -178,21 +250,18 @@ async function fetchData(): Promise<AppData> {
     if (response.ok) {
       const serverData = await response.json();
       if (serverData) {
-        const migrated = migrateData(serverData);
+        const serverMigrated = migrateData(serverData);
 
-        // Compare timestamps - use newer data
-        const localLastSync = localData?.lastSync;
-        const serverLastSync = migrated.lastSync;
-
-        if (localLastSync && serverLastSync && localLastSync > serverLastSync) {
-          // Local is newer, keep it and sync to server
-          console.log('Local data is newer, keeping it');
-          return localData;
+        // If we have local data, merge it with server data
+        if (localData) {
+          const merged = mergeData(localData, serverMigrated);
+          setLocalData(merged);
+          return merged;
         }
 
-        // Server is newer or equal, use it
-        setLocalData(migrated);
-        return migrated;
+        // No local data, just use server
+        setLocalData(serverMigrated);
+        return serverMigrated;
       }
     }
   } catch (e) {
@@ -253,6 +322,11 @@ interface DataContextType {
   removeDayOverride: (date: string, itemId: string) => void;
   getDayOverrides: (date: string) => ItemOverride[];
   ensureDaySnapshot: (date: string) => void;
+  // Shopping list
+  setShoppingPlanDays: (planId: string, days: number) => void;
+  setShoppingAtHome: (itemId: string, quantity: number) => void;
+  toggleShoppingItem: (itemId: string) => void;
+  resetShopping: () => void;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -549,6 +623,50 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }));
   }, [data.daySnapshots, data.mealPlans, getDayPlanId, updateData]);
 
+  // Shopping list methods
+  const setShoppingPlanDays = useCallback((planId: string, days: number) => {
+    updateData(prev => ({
+      ...prev,
+      shopping: {
+        ...prev.shopping,
+        planDays: { ...prev.shopping.planDays, [planId]: days },
+      },
+    }));
+  }, [updateData]);
+
+  const setShoppingAtHome = useCallback((itemId: string, quantity: number) => {
+    updateData(prev => ({
+      ...prev,
+      shopping: {
+        ...prev.shopping,
+        atHome: { ...prev.shopping.atHome, [itemId]: quantity },
+      },
+    }));
+  }, [updateData]);
+
+  const toggleShoppingItem = useCallback((itemId: string) => {
+    updateData(prev => {
+      const current = prev.shopping.checkedItems || [];
+      const isChecked = current.includes(itemId);
+      return {
+        ...prev,
+        shopping: {
+          ...prev.shopping,
+          checkedItems: isChecked
+            ? current.filter(id => id !== itemId)
+            : [...current, itemId],
+        },
+      };
+    });
+  }, [updateData]);
+
+  const resetShopping = useCallback(() => {
+    updateData(prev => ({
+      ...prev,
+      shopping: { planDays: {}, atHome: {}, checkedItems: [] },
+    }));
+  }, [updateData]);
+
   // Force sync
   const forceSync = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -581,6 +699,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         removeDayOverride,
         getDayOverrides,
         ensureDaySnapshot,
+        setShoppingPlanDays,
+        setShoppingAtHome,
+        toggleShoppingItem,
+        resetShopping,
       }}
     >
       {children}
