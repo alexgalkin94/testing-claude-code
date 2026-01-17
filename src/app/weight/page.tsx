@@ -12,36 +12,72 @@ import InfoSheet from '@/components/InfoSheet';
 import { useData } from '@/lib/data-store';
 import { getItemTotals, getPlanTotals, DEFAULT_PLAN_A, DEFAULT_PLAN_B } from '@/lib/mealPlan';
 
-// Calculate 7-day moving average for weights
-function getMovingAverage(weights: Array<{ date: string; weight: number }>, days: number = 7): { date: string; avg: number }[] {
+// Calculate Exponentially Weighted Moving Average (EWMA) for weights
+// Used by MacroFactor, Hacker's Diet, and scientific literature
+// α = 0.1 means today has 10% weight, yesterday 9%, etc. (~20-day equivalent smoothing)
+function getWeightTrend(weights: Array<{ date: string; weight: number }>, alpha: number = 0.1): { date: string; trend: number }[] {
   if (weights.length === 0) return [];
 
-  return weights.map((entry, index) => {
-    const start = Math.max(0, index - days + 1);
-    const slice = weights.slice(start, index + 1);
-    const avg = slice.reduce((sum, w) => sum + w.weight, 0) / slice.length;
-    return { date: entry.date, avg: Math.round(avg * 10) / 10 };
-  });
+  // Sort by date to ensure correct order
+  const sorted = [...weights].sort((a, b) => a.date.localeCompare(b.date));
+
+  const result: { date: string; trend: number }[] = [];
+  let trend = sorted[0].weight; // Initialize with first weight
+
+  for (const entry of sorted) {
+    // EWMA formula: trend = α × weight + (1 - α) × previous_trend
+    trend = alpha * entry.weight + (1 - alpha) * trend;
+    result.push({ date: entry.date, trend: Math.round(trend * 100) / 100 });
+  }
+
+  return result;
 }
 
 // Calculate expected weight trajectory based on caloric deficit
+// Uses average of days 7-14 as baseline (after initial water weight loss)
 function getExpectedWeights(
   weights: Array<{ date: string; weight: number }>,
+  startDate: string,
   dailyCalories: number = 1700,
   estimatedTdee: number = 2200
 ): { date: string; expected: number }[] {
   if (weights.length === 0) return [];
 
-  const firstWeight = weights[0].weight;
-  const firstDate = new Date(weights[0].date);
+  const sorted = [...weights].sort((a, b) => a.date.localeCompare(b.date));
+  const start = new Date(startDate);
+
+  // Find weights from days 7-14 for baseline (after water weight period)
+  const day7 = addDays(start, 7);
+  const day14 = addDays(start, 14);
+  const baselineWeights = sorted.filter(w => {
+    const d = new Date(w.date);
+    return d >= day7 && d <= day14;
+  });
+
+  // Use average of days 7-14 as baseline, or first available weight if not enough data
+  let baselineWeight: number;
+  let baselineDate: Date;
+
+  if (baselineWeights.length >= 3) {
+    baselineWeight = baselineWeights.reduce((sum, w) => sum + w.weight, 0) / baselineWeights.length;
+    baselineDate = day7;
+  } else {
+    // Not enough data yet - use first weight
+    baselineWeight = sorted[0].weight;
+    baselineDate = new Date(sorted[0].date);
+  }
 
   // Expected daily loss based on deficit (7700 kcal = 1 kg fat)
   const dailyDeficit = estimatedTdee - dailyCalories;
   const dailyLossKg = dailyDeficit / 7700;
 
-  return weights.map((entry) => {
-    const daysFromStart = differenceInDays(new Date(entry.date), firstDate);
-    const expectedWeight = firstWeight - (daysFromStart * dailyLossKg);
+  return sorted.map((entry) => {
+    const daysFromBaseline = differenceInDays(new Date(entry.date), baselineDate);
+    // Only show expected line from baseline onwards
+    if (daysFromBaseline < 0) {
+      return { date: entry.date, expected: entry.weight }; // Just show actual weight before baseline
+    }
+    const expectedWeight = baselineWeight - (daysFromBaseline * dailyLossKg);
     return { date: entry.date, expected: Math.round(expectedWeight * 10) / 10 };
   });
 }
@@ -55,6 +91,7 @@ export default function WeightPage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   // TDEE Calculation - must be before any early returns
+  // Fixed: Now uses actual DATES instead of entry counts for accurate time periods
   const tdeeTracking = useMemo(() => {
     if (!data.profile) {
       return {
@@ -82,39 +119,57 @@ export default function WeightPage() {
       w => new Date(w.date) >= startDatePlus7
     );
 
-    // Use 14-day rolling averages
-    const last14Weights = weightsAfterWaterPeriod.slice(-14);
-    const prev14Weights = weightsAfterWaterPeriod.slice(-28, -14);
+    // Calculate weight trend using EWMA for more accurate weekly trend
+    const trendData = getWeightTrend(weightsAfterWaterPeriod, 0.1);
 
-    const rollingAvgWeight = last14Weights.length > 0
-      ? last14Weights.reduce((sum, w) => sum + w.weight, 0) / last14Weights.length
-      : data.profile.currentWeight;
+    // Get trend values from actual DATE ranges (not entry counts!)
+    const twoWeeksAgo = subDays(today, 14);
+    const fourWeeksAgo = subDays(today, 28);
 
-    const prevAvgWeight = prev14Weights.length > 0
-      ? prev14Weights.reduce((sum, w) => sum + w.weight, 0) / prev14Weights.length
+    // Find trend values closest to these dates
+    const recentTrends = trendData.filter(t => new Date(t.date) >= twoWeeksAgo);
+    const olderTrends = trendData.filter(t => {
+      const d = new Date(t.date);
+      return d >= fourWeeksAgo && d < twoWeeksAgo;
+    });
+
+    // Calculate average trend for each 2-week period
+    const recentAvgTrend = recentTrends.length > 0
+      ? recentTrends.reduce((sum, t) => sum + t.trend, 0) / recentTrends.length
       : null;
 
-    const biWeeklyTrend = prevAvgWeight !== null && last14Weights.length >= 7
-      ? prevAvgWeight - rollingAvgWeight
+    const olderAvgTrend = olderTrends.length > 0
+      ? olderTrends.reduce((sum, t) => sum + t.trend, 0) / olderTrends.length
       : null;
 
-    const weeklyTrend = biWeeklyTrend !== null ? biWeeklyTrend / 2 : null;
+    // Weekly trend: weight lost per week (kg)
+    // Based on actual 2-week comparison using trend values
+    let weeklyTrend: number | null = null;
+    if (recentAvgTrend !== null && olderAvgTrend !== null && recentTrends.length >= 5 && olderTrends.length >= 5) {
+      const biWeeklyTrend = olderAvgTrend - recentAvgTrend; // Positive = losing weight
+      weeklyTrend = biWeeklyTrend / 2;
+    }
 
     let calculatedTdee: number | null = null;
     let tdeeConfidence: 'low' | 'medium' | 'high' | null = null;
 
-    if (daysElapsed >= 21 && weightsAfterWaterPeriod.length >= 10) {
+    if (daysElapsed >= 21 && weightsAfterWaterPeriod.length >= 10 && weeklyTrend !== null && weeklyTrend > 0.1) {
+      // Calculate calories consumed over the SAME date range as weight data
+      // Use the last 28 days (matching our weight trend period)
       let totalCaloriesConsumed = 0;
       let daysWithData = 0;
 
-      for (let i = 7; i < Math.min(daysElapsed, 35); i++) {
-        const dateStr = format(subDays(today, daysElapsed - i), 'yyyy-MM-dd');
-        // Get the plan that was selected for this day
+      for (let i = 0; i < 28; i++) {
+        const dateStr = format(subDays(today, i), 'yyyy-MM-dd');
+        const dateObj = new Date(dateStr);
+
+        // Skip if before day 7
+        if (dateObj < startDatePlus7) continue;
+
         const dayPlanId = getDayPlanId(dateStr);
         const dayCheckedItems = getChecklistItems(dateStr, dayPlanId);
         const extraCals = data.extraCalories?.[dateStr] || 0;
 
-        // Get the snapshot for this specific date and plan
         const daySnapshot = getDaySnapshot(dateStr, dayPlanId);
         const dayPlan = daySnapshot
           ? { meals: daySnapshot.meals }
@@ -138,11 +193,13 @@ export default function WeightPage() {
         }
       }
 
-      if (daysWithData >= 10 && weeklyTrend !== null && weeklyTrend > 0.1) {
+      if (daysWithData >= 10) {
         const avgDailyCalories = totalCaloriesConsumed / daysWithData;
+        // TDEE = calories eaten + deficit (deficit = weight loss in energy terms)
         const dailyDeficitFromWeight = (weeklyTrend * 7700) / 7;
         calculatedTdee = Math.round(avgDailyCalories + dailyDeficitFromWeight);
 
+        // Confidence based on data quality
         if (daysElapsed >= 35 && daysWithData >= 21 && weightsAfterWaterPeriod.length >= 21) {
           tdeeConfidence = 'high';
         } else if (daysElapsed >= 28 && daysWithData >= 14) {
@@ -174,12 +231,12 @@ export default function WeightPage() {
   };
 
   const exportProgress = async (formatType: 'json' | 'table' | 'text') => {
-    const sortedWeights = [...data.weights].sort(
+    const exportSortedWeights = [...data.weights].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
-    const movingAvg = getMovingAverage(sortedWeights);
-    const latestWeight = sortedWeights[sortedWeights.length - 1]?.weight;
-    const firstWeight = sortedWeights[0]?.weight;
+    const exportTrendData = getWeightTrend(exportSortedWeights, 0.1);
+    const latestWeight = exportSortedWeights[exportSortedWeights.length - 1]?.weight;
+    const firstWeight = exportSortedWeights[0]?.weight;
     const totalLost = firstWeight && latestWeight ? firstWeight - latestWeight : 0;
     const remaining = latestWeight ? latestWeight - data.profile.goalWeight : 0;
 
@@ -202,17 +259,17 @@ export default function WeightPage() {
           remaining: Math.round(remaining * 10) / 10,
           weeklyTrend: tdeeTracking.weeklyTrend ? Math.round(tdeeTracking.weeklyTrend * 100) / 100 : null,
         },
-        weights: sortedWeights.map((w, i) => ({
+        weights: exportSortedWeights.map((w, i) => ({
           date: w.date,
           weight: w.weight,
-          trend: movingAvg[i]?.avg || null,
+          trend: exportTrendData[i]?.trend || null,
         })),
       };
       await navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
     } else if (formatType === 'table') {
-      let table = 'Datum\tGewicht\tTrend\n';
-      sortedWeights.forEach((w, i) => {
-        table += `${w.date}\t${w.weight}\t${movingAvg[i]?.avg || '-'}\n`;
+      let table = 'Datum\tGewicht\tTrend (EWMA)\n';
+      exportSortedWeights.forEach((w, i) => {
+        table += `${w.date}\t${w.weight}\t${exportTrendData[i]?.trend || '-'}\n`;
       });
       table += '\n--- Zusammenfassung ---\n';
       table += `Startgewicht:\t${data.profile.startWeight} kg\n`;
@@ -274,12 +331,16 @@ export default function WeightPage() {
   const planBTotals = getPlanTotals(DEFAULT_PLAN_B);
   const avgDailyCalories = (planATotals.calories + planBTotals.calories) / 2;
 
-  const movingAvg = getMovingAverage(weights);
-  const expectedWeights = getExpectedWeights(weights, avgDailyCalories, estimatedTdee);
-  const chartData = weights.map((w, i) => ({
+  // Sort weights for consistent display
+  const sortedWeights = [...weights].sort((a, b) => a.date.localeCompare(b.date));
+  const trendData = getWeightTrend(sortedWeights, 0.1);
+  const expectedWeights = getExpectedWeights(sortedWeights, data.profile.startDate, avgDailyCalories, estimatedTdee);
+
+  // Create chart data with trend instead of simple average
+  const chartData = sortedWeights.map((w, i) => ({
     date: format(new Date(w.date), 'd.M.', { locale: de }),
     weight: w.weight,
-    avg: movingAvg[i]?.avg,
+    trend: trendData[i]?.trend,
     expected: expectedWeights[i]?.expected,
   }));
 
@@ -477,7 +538,7 @@ export default function WeightPage() {
                   labelStyle={{ color: '#a1a1aa' }}
                   formatter={(value, name) => {
                     if (value == null) return [];
-                    const label = name === 'weight' ? 'Aktuell' : name === 'avg' ? 'Trend' : 'Erwartet';
+                    const label = name === 'weight' ? 'Aktuell' : name === 'trend' ? 'Trend (EWMA)' : 'Erwartet';
                     return [`${value} kg`, label];
                   }}
                 />
@@ -499,14 +560,14 @@ export default function WeightPage() {
                   dot={false}
                   name="expected"
                 />
-                {/* Trend line - solid amber, smoothed actual data */}
+                {/* Trend line - solid amber, EWMA smoothed data */}
                 <Line
                   type="monotone"
-                  dataKey="avg"
+                  dataKey="trend"
                   stroke="#f59e0b"
                   strokeWidth={2}
                   dot={false}
-                  name="avg"
+                  name="trend"
                 />
                 {/* Actual weight dots - rendered last to be on top */}
                 <Line
@@ -576,11 +637,15 @@ export default function WeightPage() {
               <span className="font-medium text-amber-500">Trend (Gelbe Linie)</span>
             </div>
             <p className="text-[15px] text-zinc-400 mb-2">
-              7-Tage gleitender Durchschnitt deines Gewichts. Glättet tägliche Schwankungen (Wasser, Verdauung) und zeigt die echte Richtung.
+              Exponentiell gewichteter Durchschnitt (EWMA) - reagiert schneller auf echte Veränderungen als ein einfacher Durchschnitt.
             </p>
-            <div className="bg-zinc-800 rounded-xl p-3 text-[13px] font-mono">
-              Trend = Ø der letzten 7 Messungen
+            <div className="bg-zinc-800 rounded-xl p-3 text-[13px] font-mono space-y-1">
+              <div>Trend = 10% × Heute + 90% × Gestern</div>
+              <div className="text-zinc-500">Heute: 10%, Gestern: 9%, Vorgestern: 8.1%...</div>
             </div>
+            <p className="text-[13px] text-zinc-500 mt-2">
+              Dips werden sofort reflektiert, aber Ausreißer (Bloating) verfallen schnell.
+            </p>
           </div>
 
           {/* Erwartet */}
@@ -590,10 +655,10 @@ export default function WeightPage() {
               <span className="font-medium text-emerald-500">Erwartet (Grün gestrichelt)</span>
             </div>
             <p className="text-[15px] text-zinc-400 mb-2">
-              Theoretischer Gewichtsverlust basierend auf deinem Kaloriendefizit.
+              Theoretischer Gewichtsverlust basierend auf deinem Kaloriendefizit. Startet ab Tag 7 (nach Wasserverlust).
             </p>
             <div className="bg-zinc-800 rounded-xl p-3 text-[13px] font-mono space-y-1">
-              <div>Defizit = TDEE − Kalorienaufnahme</div>
+              <div>Baseline = Ø Gewicht Tag 7-14</div>
               <div>Verlust/Tag = Defizit ÷ 7700 kcal</div>
               <div className="text-zinc-500">(7700 kcal = 1 kg Körperfett)</div>
             </div>
@@ -606,11 +671,12 @@ export default function WeightPage() {
               <span className="font-medium text-blue-400">TDEE Berechnung</span>
             </div>
             <p className="text-[15px] text-zinc-400 mb-2">
-              Nach 21+ Tagen Tracking wird dein echter TDEE automatisch berechnet:
+              Nach 21+ Tagen wird dein TDEE aus den letzten 28 Tagen berechnet (Kalorien + Trend-Gewichtsverlust):
             </p>
-            <div className="bg-zinc-800 rounded-xl p-3 text-[13px] font-mono">
-              <div>TDEE = Ø Kalorien + (Gewichtsverlust × 1100)</div>
-              <div className="text-zinc-500 mt-1">Wobei: 1100 = 7700 ÷ 7 Tage</div>
+            <div className="bg-zinc-800 rounded-xl p-3 text-[13px] font-mono space-y-1">
+              <div>TDEE = Ø Kalorien + Defizit</div>
+              <div>Defizit = (Trend-Verlust/Woche × 7700) ÷ 7</div>
+              <div className="text-zinc-500 mt-1">Nutzt EWMA-Trend für genaue Wochenwerte</div>
             </div>
             <p className="text-[13px] text-zinc-500 mt-2">
               Aktueller TDEE: {tdeeTracking.calculatedTdee || data.profile.tdee} kcal
