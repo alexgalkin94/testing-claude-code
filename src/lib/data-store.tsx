@@ -209,7 +209,7 @@ async function saveData(data: AppData): Promise<AppData> {
   // Save to localStorage immediately
   setLocalData(dataWithTimestamp);
 
-  // Sync to server
+  // Sync to database
   const response = await fetch('/api/sync', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

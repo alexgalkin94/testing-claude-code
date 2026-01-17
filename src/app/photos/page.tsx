@@ -316,19 +316,47 @@ function ZoomableImage({ src, alt }: { src: string; alt: string }) {
   );
 }
 
+const PHOTOS_CACHE_KEY = 'cutboard_photos_cache';
+
+function getCachedPhotos(): Photo[] | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const cached = sessionStorage.getItem(PHOTOS_CACHE_KEY);
+    if (cached) return JSON.parse(cached);
+  } catch { /* ignore */ }
+  return null;
+}
+
+function setCachedPhotos(photos: Photo[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(PHOTOS_CACHE_KEY, JSON.stringify(photos));
+  } catch { /* ignore */ }
+}
+
 export default function PhotosPage() {
   const { data } = useData();
   const blurPhotos = data.profile.blurPhotos;
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [photos, setPhotos] = useState<Photo[]>(() => getCachedPhotos() || []);
+  const [loading, setLoading] = useState(() => !getCachedPhotos());
   const [uploading, setUploading] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const [comparePhotos, setComparePhotos] = useState<[Photo | null, Photo | null]>([null, null]);
   const [showViewer, setShowViewer] = useState<Photo | null>(null);
   const [showCamera, setShowCamera] = useState(false);
 
+  // Persist photos to sessionStorage when they change
   useEffect(() => {
-    loadPhotos();
+    if (photos.length > 0) {
+      setCachedPhotos(photos);
+    }
+  }, [photos]);
+
+  useEffect(() => {
+    // Only fetch if no cached photos
+    if (!getCachedPhotos()) {
+      loadPhotos();
+    }
   }, []);
 
   const loadPhotos = async () => {
@@ -349,8 +377,9 @@ export default function PhotosPage() {
     setUploading(true);
     try {
       const formData = new FormData();
+      const photoDate = format(new Date(), 'yyyy-MM-dd');
       formData.append('file', file);
-      formData.append('date', format(new Date(), 'yyyy-MM-dd'));
+      formData.append('date', photoDate);
 
       const response = await fetch('/api/photos', {
         method: 'POST',
@@ -358,7 +387,15 @@ export default function PhotosPage() {
       });
 
       if (response.ok) {
-        await loadPhotos();
+        const result = await response.json();
+        // Add new photo to state instead of refetching all photos
+        const newPhoto: Photo = {
+          url: result.url,
+          pathname: '',
+          date: result.date || photoDate,
+          uploadedAt: new Date().toISOString(),
+        };
+        setPhotos(prev => [newPhoto, ...prev]);
       }
     } catch (error) {
       console.error('Upload failed:', error);
@@ -387,7 +424,8 @@ export default function PhotosPage() {
       });
 
       if (response.ok) {
-        await loadPhotos();
+        // Remove photo from state instead of refetching all photos
+        setPhotos(prev => prev.filter(p => p.url !== photo.url));
         setShowViewer(null);
       }
     } catch (error) {

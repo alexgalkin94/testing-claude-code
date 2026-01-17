@@ -70,6 +70,15 @@ export async function GET() {
       )
     `);
 
+    // Create user_data table for app data storage (replacing Vercel Blob)
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS user_data (
+        user_id TEXT PRIMARY KEY REFERENCES user(id) ON DELETE CASCADE,
+        data TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+
     return NextResponse.json({
       success: true,
       message: 'Database tables created successfully'

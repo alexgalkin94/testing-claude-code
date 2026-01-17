@@ -1,7 +1,7 @@
-import { put, list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
+import { getUserData, saveUserData } from '@/lib/db';
 
 async function getSession() {
   return await auth.api.getSession({
@@ -17,27 +17,17 @@ export async function GET() {
   }
 
   const userId = session.user.id;
-  const dataPath = `users/${userId}/data.json`;
 
   try {
-    const { blobs } = await list({ prefix: `users/${userId}` });
-    const dataBlob = blobs.find(b => b.pathname === dataPath);
+    const data = await getUserData(userId);
 
-    if (!dataBlob) {
+    if (!data) {
       return NextResponse.json(null);
     }
 
-    const cacheBuster = `?t=${Date.now()}`;
-    const response = await fetch(dataBlob.url + cacheBuster, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-      },
-    });
-    const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(JSON.parse(data));
   } catch (error) {
-    console.error('Blob GET error:', error);
+    console.error('DB GET error:', error);
     return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 });
   }
 }
@@ -51,21 +41,15 @@ export async function POST(request: Request) {
     }
 
     const userId = session.user.id;
-    const dataPath = `users/${userId}/data.json`;
-
     const data = await request.json();
     data.lastSync = new Date().toISOString();
     data.userId = userId;
 
-    const blob = await put(dataPath, JSON.stringify(data), {
-      access: 'public',
-      addRandomSuffix: false,
-      allowOverwrite: true,
-    });
+    await saveUserData(userId, JSON.stringify(data));
 
-    return NextResponse.json({ success: true, url: blob.url, lastSync: data.lastSync });
+    return NextResponse.json({ success: true, lastSync: data.lastSync });
   } catch (error) {
-    console.error('Blob POST error:', error);
+    console.error('DB POST error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ error: `Failed to save: ${message}` }, { status: 500 });
   }
