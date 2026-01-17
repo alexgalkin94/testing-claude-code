@@ -39,14 +39,14 @@ export default function BottomNav() {
               key={href}
               href={href}
               prefetch={true}
-              className={`flex flex-col items-center justify-center min-w-[56px] min-h-[56px] px-3 py-2 rounded-xl transition-colors active:scale-95 ${
+              className={`flex flex-col items-center justify-center px-3 py-1 rounded-lg transition-colors active:scale-95 ${
                 isActive
-                  ? 'text-white bg-zinc-800/50'
+                  ? 'text-white'
                   : 'text-zinc-500 active:text-zinc-300'
               }`}
             >
-              <Icon size={24} />
-              <span className="text-[11px] mt-1 font-medium">{label}</span>
+              <Icon size={22} />
+              <span className="text-[10px] mt-0.5 font-medium">{label}</span>
             </Link>
           );
         })}
