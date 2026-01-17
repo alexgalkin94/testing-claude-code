@@ -241,6 +241,7 @@ export default function WeightPage() {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
     const exportTrendData = getWeightTrend(exportSortedWeights, 0.1);
+    const exportTrendByDate = new Map(exportTrendData.map(t => [t.date, t.trend]));
     const latestWeight = exportSortedWeights[exportSortedWeights.length - 1]?.weight;
     const firstWeight = exportSortedWeights[0]?.weight;
     const totalLost = firstWeight && latestWeight ? firstWeight - latestWeight : 0;
@@ -265,17 +266,17 @@ export default function WeightPage() {
           remaining: Math.round(remaining * 10) / 10,
           weeklyTrend: tdeeTracking.weeklyTrend ? Math.round(tdeeTracking.weeklyTrend * 100) / 100 : null,
         },
-        weights: exportSortedWeights.map((w, i) => ({
+        weights: exportSortedWeights.map((w) => ({
           date: w.date,
           weight: w.weight,
-          trend: exportTrendData[i]?.trend || null,
+          trend: exportTrendByDate.get(w.date) || null,
         })),
       };
       await navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
     } else if (formatType === 'table') {
       let table = 'Datum\tGewicht\tTrend (EWMA)\n';
-      exportSortedWeights.forEach((w, i) => {
-        table += `${w.date}\t${w.weight}\t${exportTrendData[i]?.trend || '-'}\n`;
+      exportSortedWeights.forEach((w) => {
+        table += `${w.date}\t${w.weight}\t${exportTrendByDate.get(w.date) || '-'}\n`;
       });
       table += '\n--- Zusammenfassung ---\n';
       table += `Startgewicht:\t${data.profile.startWeight} kg\n`;
@@ -308,7 +309,7 @@ export default function WeightPage() {
       text += `🎯 Kalorien: ${data.profile.calorieTarget} kcal\n`;
       text += `💪 Protein: ${data.profile.proteinTarget}g\n\n`;
       text += `Letzte 7 Einträge:\n`;
-      sortedWeights.slice(-7).forEach(w => {
+      exportSortedWeights.slice(-7).forEach(w => {
         text += `• ${format(new Date(w.date), 'd.M.', { locale: de })}: ${w.weight} kg\n`;
       });
       await navigator.clipboard.writeText(text);
@@ -342,12 +343,16 @@ export default function WeightPage() {
   const trendData = getWeightTrend(sortedWeights, 0.1);
   const expectedWeights = getExpectedWeights(sortedWeights, data.profile.startDate, avgDailyCalories, estimatedTdee);
 
-  // Create chart data with trend instead of simple average
-  const chartData = sortedWeights.map((w, i) => ({
+  // Create lookup maps by date to avoid index mismatch bugs
+  const trendByDate = new Map(trendData.map(t => [t.date, t.trend]));
+  const expectedByDate = new Map(expectedWeights.map(e => [e.date, e.expected]));
+
+  // Create chart data with proper date-based lookups
+  const chartData = sortedWeights.map((w) => ({
     date: format(new Date(w.date), 'd.M.', { locale: de }),
     weight: w.weight,
-    trend: trendData[i]?.trend,
-    expected: expectedWeights[i]?.expected,
+    trend: trendByDate.get(w.date),
+    expected: expectedByDate.get(w.date),
   }));
 
   const latestWeight = weights[weights.length - 1]?.weight;
