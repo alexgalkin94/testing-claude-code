@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useCallback, ReactNode, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   MealPlan,
@@ -334,6 +334,10 @@ const DataContext = createContext<DataContextType | null>(null);
 export function DataProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
+  // Debounce timer and pending data for batching rapid updates
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingDataRef = useRef<AppData | null>(null);
+
   // Main data query
   const { data: queryData, isLoading } = useQuery({
     queryKey: QUERY_KEY,
@@ -343,22 +347,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const data = queryData || DEFAULT_DATA;
 
-  // Mutation for saving data
+  // Mutation for saving data - simple pattern:
+  // Cache is already correct from optimistic update, onSuccess just updates lastSync
   const mutation = useMutation({
     mutationFn: saveData,
-    onMutate: async (newData) => {
-      // Cancel outgoing refetches
+    onMutate: async () => {
+      // Cancel outgoing refetches to prevent race conditions
       await queryClient.cancelQueries({ queryKey: QUERY_KEY });
-
-      // Snapshot previous value for rollback
-      const previousData = queryClient.getQueryData<AppData>(QUERY_KEY);
-
-      return { previousData };
+      // Snapshot for potential rollback
+      return { previousData: queryClient.getQueryData<AppData>(QUERY_KEY) };
     },
     onSuccess: (result) => {
-      // Update with server-confirmed timestamp
-      queryClient.setQueryData(QUERY_KEY, result);
-      setLocalData(result);
+      // Only update the lastSync timestamp - cache is already correct
+      queryClient.setQueryData<AppData>(QUERY_KEY, prev =>
+        prev ? { ...prev, lastSync: result.lastSync } : prev
+      );
     },
     onError: (err, _newData, context) => {
       // Rollback on error
@@ -373,19 +376,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const isSyncing = mutation.isPending;
   const lastSyncError = mutation.isError ? 'Sync fehlgeschlagen' : null;
 
-  // Helper to update data - updates cache synchronously before mutation
+  // Helper to update data - updates cache synchronously, debounces server sync
   const updateData = useCallback((updater: (prev: AppData) => AppData) => {
     // Read current data from cache
     const currentData = queryClient.getQueryData<AppData>(QUERY_KEY) || DEFAULT_DATA;
     const newData = updater(currentData);
 
-    // Update cache and localStorage SYNCHRONOUSLY before mutate
-    // This prevents race conditions when rapid updates occur
+    // Update cache and localStorage SYNCHRONOUSLY for instant UI response
     queryClient.setQueryData(QUERY_KEY, newData);
     setLocalData(newData);
 
-    // Then trigger the server sync
-    mutation.mutate(newData);
+    // Store pending data for debounced sync
+    pendingDataRef.current = newData;
+
+    // Debounce server sync - wait 300ms for rapid updates to settle
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      if (pendingDataRef.current) {
+        mutation.mutate(pendingDataRef.current);
+        pendingDataRef.current = null;
+      }
+    }, 300);
   }, [queryClient, mutation]);
 
   // Profile
