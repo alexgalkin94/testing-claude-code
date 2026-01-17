@@ -41,6 +41,7 @@ function getWeightTrend(weights: Array<{ date: string; weight: number }>, alpha:
 
 // Calculate expected weight trajectory based on caloric deficit
 // Uses average of days 7-14 as baseline (after initial water weight loss)
+// Returns a smooth linear projection - NOT tied to actual weight entries
 function getExpectedWeights(
   weights: Array<{ date: string; weight: number }>,
   startDate: string,
@@ -79,10 +80,11 @@ function getExpectedWeights(
 
   return sorted.map((entry) => {
     const daysFromBaseline = differenceInDays(new Date(entry.date), baselineDate);
-    // Only show expected line from baseline onwards
+    // Before baseline: no expected value (will show as gap in chart)
     if (daysFromBaseline < 0) {
-      return { date: entry.date, expected: entry.weight }; // Just show actual weight before baseline
+      return { date: entry.date, expected: NaN }; // NaN = no line segment
     }
+    // Linear projection from baseline
     const expectedWeight = baselineWeight - (daysFromBaseline * dailyLossKg);
     return { date: entry.date, expected: Math.round(expectedWeight * 10) / 10 };
   });
@@ -345,14 +347,18 @@ export default function WeightPage() {
 
   // Create lookup maps by date to avoid index mismatch bugs
   const trendByDate = new Map(trendData.map(t => [t.date, t.trend]));
-  const expectedByDate = new Map(expectedWeights.map(e => [e.date, e.expected]));
+  const expectedByDate = new Map(
+    expectedWeights
+      .filter(e => !isNaN(e.expected)) // Filter out NaN values (before baseline)
+      .map(e => [e.date, e.expected])
+  );
 
   // Create chart data with proper date-based lookups
   const chartData = sortedWeights.map((w) => ({
     date: format(new Date(w.date), 'd.M.', { locale: de }),
     weight: w.weight,
     trend: trendByDate.get(w.date),
-    expected: expectedByDate.get(w.date),
+    expected: expectedByDate.get(w.date), // undefined before baseline = no line
   }));
 
   const latestWeight = weights[weights.length - 1]?.weight;
