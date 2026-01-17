@@ -1,4 +1,5 @@
-import { S3Client, ListObjectsV2Command, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, ListObjectsV2Command, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 let client: S3Client | null = null;
 
@@ -26,13 +27,24 @@ export function getR2Client(): S3Client {
 }
 
 export const R2_BUCKET = process.env.R2_BUCKET_NAME || 'cutboard-photos';
-export const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || '';
+
+// URL expires after 1 hour
+const SIGNED_URL_EXPIRES_IN = 3600;
 
 export interface PhotoInfo {
   url: string;
   key: string;
   date: string;
   uploadedAt: string;
+}
+
+export async function getSignedPhotoUrl(key: string): Promise<string> {
+  const r2 = getR2Client();
+  const command = new GetObjectCommand({
+    Bucket: R2_BUCKET,
+    Key: key,
+  });
+  return getSignedUrl(r2, command, { expiresIn: SIGNED_URL_EXPIRES_IN });
 }
 
 export async function listPhotos(userId: string): Promise<PhotoInfo[]> {
@@ -52,8 +64,11 @@ export async function listPhotos(userId: string): Promise<PhotoInfo[]> {
     const filename = obj.Key.split('/').pop() || '';
     const datePart = filename.split('_')[0];
 
+    // Generate signed URL for each photo
+    const signedUrl = await getSignedPhotoUrl(obj.Key);
+
     photos.push({
-      url: `${R2_PUBLIC_URL}/${obj.Key}`,
+      url: signedUrl,
       key: obj.Key,
       date: datePart,
       uploadedAt: obj.LastModified?.toISOString() || '',
@@ -81,8 +96,11 @@ export async function uploadPhoto(
 
   await r2.send(command);
 
+  // Return signed URL for immediate display
+  const signedUrl = await getSignedPhotoUrl(key);
+
   return {
-    url: `${R2_PUBLIC_URL}/${key}`,
+    url: signedUrl,
     key,
   };
 }
