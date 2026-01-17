@@ -15,11 +15,17 @@ import { getItemTotals, getPlanTotals, DEFAULT_PLAN_A, DEFAULT_PLAN_B } from '@/
 // Calculate Exponentially Weighted Moving Average (EWMA) for weights
 // Used by MacroFactor, Hacker's Diet, and scientific literature
 // α = 0.1 means today has 10% weight, yesterday 9%, etc. (~20-day equivalent smoothing)
+// Limited to last 90 entries for performance (captures 99.99% of signal)
+const EWMA_MAX_ENTRIES = 90;
+
 function getWeightTrend(weights: Array<{ date: string; weight: number }>, alpha: number = 0.1): { date: string; trend: number }[] {
   if (weights.length === 0) return [];
 
-  // Sort by date to ensure correct order
-  const sorted = [...weights].sort((a, b) => a.date.localeCompare(b.date));
+  // Sort by date (newest first), limit to last 90 entries, then reverse for chronological processing
+  const sorted = [...weights]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, EWMA_MAX_ENTRIES)
+    .reverse();
 
   const result: { date: string; trend: number }[] = [];
   let trend = sorted[0].weight; // Initialize with first weight
