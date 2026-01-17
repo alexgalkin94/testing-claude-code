@@ -231,38 +231,39 @@ export default function SettingsPage() {
           <Camera size={18} className="text-blue-500" />
           <h2 className="font-medium">Fotos</h2>
         </div>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-zinc-300">Fotos-Tab anzeigen</p>
-              <p className="text-xs text-zinc-500">Tab in der Navigation ein-/ausblenden</p>
+        {/* Apple HIG: 44pt min row height, 51pt x 31pt toggle */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between min-h-[44px] py-2">
+            <div className="flex-1 mr-4">
+              <p className="text-[17px] text-zinc-300">Fotos-Tab anzeigen</p>
+              <p className="text-[13px] text-zinc-500">Tab in der Navigation ein-/ausblenden</p>
             </div>
             <button
               onClick={() => updateField('showPhotosTab', !profile.showPhotosTab)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${
+              className={`relative w-[51px] h-[31px] rounded-full transition-colors flex-shrink-0 ${
                 profile.showPhotosTab ? 'bg-emerald-500' : 'bg-zinc-700'
               }`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                className={`absolute top-[2px] left-[2px] w-[27px] h-[27px] bg-white rounded-full shadow-sm transition-transform ${
                   profile.showPhotosTab ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
             </button>
           </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-zinc-300">Fotos verschwommen</p>
-              <p className="text-xs text-zinc-500">Vorschaubilder werden geblurt</p>
+          <div className="flex items-center justify-between min-h-[44px] py-2">
+            <div className="flex-1 mr-4">
+              <p className="text-[17px] text-zinc-300">Fotos verschwommen</p>
+              <p className="text-[13px] text-zinc-500">Vorschaubilder werden geblurt</p>
             </div>
             <button
               onClick={() => updateField('blurPhotos', !profile.blurPhotos)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${
+              className={`relative w-[51px] h-[31px] rounded-full transition-colors flex-shrink-0 ${
                 profile.blurPhotos ? 'bg-emerald-500' : 'bg-zinc-700'
               }`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                className={`absolute top-[2px] left-[2px] w-[27px] h-[27px] bg-white rounded-full shadow-sm transition-transform ${
                   profile.blurPhotos ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />

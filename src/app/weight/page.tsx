@@ -303,10 +303,11 @@ export default function WeightPage() {
               <Download size={18} />
             </button>
             {showExportMenu && (
-              <div className="absolute right-0 top-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-10 py-1 min-w-[120px]">
-                <button onClick={() => exportProgress('text')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">Text</button>
-                <button onClick={() => exportProgress('table')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">Tabelle</button>
-                <button onClick={() => exportProgress('json')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">JSON</button>
+              <div className="absolute right-0 top-full mt-1 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl z-10 py-1 min-w-[140px]">
+                {/* Apple HIG: 44pt min row height */}
+                <button onClick={() => exportProgress('text')} className="w-full text-left px-4 min-h-[44px] text-[17px] hover:bg-zinc-700 flex items-center">Text</button>
+                <button onClick={() => exportProgress('table')} className="w-full text-left px-4 min-h-[44px] text-[17px] hover:bg-zinc-700 flex items-center">Tabelle</button>
+                <button onClick={() => exportProgress('json')} className="w-full text-left px-4 min-h-[44px] text-[17px] hover:bg-zinc-700 flex items-center">JSON</button>
               </div>
             )}
           </div>
@@ -532,18 +533,19 @@ export default function WeightPage() {
 
       {/* History */}
       <Card>
-        <h3 className="text-sm font-medium text-zinc-400 mb-3">Verlauf</h3>
-        <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
+        <h3 className="text-[15px] font-medium text-zinc-400 mb-3">Verlauf</h3>
+        {/* Apple HIG: 44pt min row height */}
+        <div className="space-y-0 max-h-64 overflow-y-auto no-scrollbar">
           {[...weights].reverse().slice(0, 10).map((entry, i) => (
-            <div key={i} className="flex justify-between items-center py-2 border-b border-zinc-800 last:border-0">
-              <span className="text-zinc-400 text-sm">
+            <div key={i} className="flex justify-between items-center min-h-[44px] py-2 border-b border-zinc-800 last:border-0">
+              <span className="text-zinc-400 text-[15px]">
                 {format(new Date(entry.date), 'd. MMMM yyyy', { locale: de })}
               </span>
-              <span className="font-medium">{entry.weight} kg</span>
+              <span className="text-[17px] font-medium">{entry.weight} kg</span>
             </div>
           ))}
           {weights.length === 0 && (
-            <p className="text-zinc-500 text-center py-4">Noch keine Einträge</p>
+            <p className="text-zinc-500 text-center py-4 text-[15px]">Noch keine Einträge</p>
           )}
         </div>
       </Card>
