@@ -33,7 +33,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Mobile Layout */}
         <div className="lg:hidden">
-          <main className="min-h-screen pb-24 max-w-lg mx-auto">
+          {/* pb-[83px] = 49px tab bar + 34px safe area */}
+          <main className="min-h-screen pb-[calc(49px+env(safe-area-inset-bottom,34px))] max-w-lg mx-auto">
             {children}
           </main>
           <BottomNav />
