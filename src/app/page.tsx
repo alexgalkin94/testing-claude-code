@@ -405,19 +405,19 @@ export default function TodayPage() {
 
         {/* Left Column - Stats & Controls (Desktop) */}
         <div className="lg:col-span-4 lg:space-y-6">
-          {/* Date Selector */}
+          {/* Date Selector - Apple HIG: 44pt touch targets */}
           <div className="flex items-center justify-between mb-6 lg:mb-0 lg:bg-zinc-900 lg:rounded-xl lg:p-4">
             <button
               onClick={goToPreviousDay}
-              className="p-2 rounded-lg hover:bg-zinc-800 transition-colors"
+              className="w-11 h-11 rounded-xl hover:bg-zinc-800 transition-colors flex items-center justify-center"
             >
-              <ChevronLeft size={20} className="text-zinc-400" />
+              <ChevronLeft size={24} className="text-zinc-400" />
             </button>
 
             <div className="text-center">
               <button
                 onClick={goToToday}
-                className={`text-sm mb-0.5 ${isViewingToday ? 'text-zinc-500' : 'text-white underline'}`}
+                className={`text-[13px] mb-0.5 min-h-[44px] px-3 flex items-center justify-center ${isViewingToday ? 'text-zinc-500' : 'text-white underline'}`}
                 disabled={isViewingToday}
               >
                 {isViewingToday ? (
@@ -435,22 +435,23 @@ export default function TodayPage() {
               <button
                 onClick={goToNextDay}
                 disabled={isViewingToday}
-                className={`p-2 rounded-lg transition-colors ${isViewingToday ? 'opacity-30' : 'hover:bg-zinc-800'}`}
+                className={`w-11 h-11 rounded-xl transition-colors flex items-center justify-center ${isViewingToday ? 'opacity-30' : 'hover:bg-zinc-800'}`}
               >
-                <ChevronRight size={20} className="text-zinc-400" />
+                <ChevronRight size={24} className="text-zinc-400" />
               </button>
               <div className="relative">
                 <button
                   onClick={() => setShowDayExportMenu(!showDayExportMenu)}
-                  className="p-2 rounded-lg hover:bg-zinc-800 transition-colors"
+                  className="w-11 h-11 rounded-xl hover:bg-zinc-800 transition-colors flex items-center justify-center"
                 >
-                  <Download size={18} className="text-zinc-400" />
+                  <Download size={20} className="text-zinc-400" />
                 </button>
                 {showDayExportMenu && (
-                  <div className="absolute right-0 top-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-10 py-1 min-w-[120px]">
-                    <button onClick={() => exportDay('text')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">Text</button>
-                    <button onClick={() => exportDay('table')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">Tabelle</button>
-                    <button onClick={() => exportDay('json')} className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-700">JSON</button>
+                  <div className="absolute right-0 top-full mt-1 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl z-10 py-1 min-w-[140px]">
+                    {/* Apple HIG: 44pt min row height */}
+                    <button onClick={() => exportDay('text')} className="w-full text-left px-4 min-h-[44px] text-[17px] hover:bg-zinc-700 flex items-center">Text</button>
+                    <button onClick={() => exportDay('table')} className="w-full text-left px-4 min-h-[44px] text-[17px] hover:bg-zinc-700 flex items-center">Tabelle</button>
+                    <button onClick={() => exportDay('json')} className="w-full text-left px-4 min-h-[44px] text-[17px] hover:bg-zinc-700 flex items-center">JSON</button>
                   </div>
                 )}
               </div>
@@ -897,35 +898,36 @@ export default function TodayPage() {
 
               return (
                 <Card key={meal.id} className="p-4 lg:p-5">
-                  <div className="flex items-center gap-3 mb-3 lg:mb-4">
+                  {/* Apple HIG: 44pt touch targets */}
+                  <div className="flex items-center gap-3 mb-3 lg:mb-4 min-h-[44px]">
                     <button
                       onClick={() => handleToggleMeal(meal)}
-                      className={`w-5 h-5 lg:w-6 lg:h-6 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
+                      className={`w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                         allMealChecked
                           ? 'bg-emerald-500 border-emerald-500 text-white'
                           : mealCheckedCount > 0
                           ? 'bg-emerald-500/30 border-emerald-500/50'
-                          : 'bg-transparent border-zinc-700 hover:border-zinc-600'
+                          : 'bg-transparent border-zinc-600 hover:border-zinc-500'
                       }`}
                     >
-                      {allMealChecked && <Check size={14} strokeWidth={2.5} />}
+                      {allMealChecked && <Check size={16} strokeWidth={2.5} />}
                     </button>
 
-                    <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-lg bg-zinc-800 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center">
                       <MealIcon
                         icon={meal.icon}
-                        size={18}
+                        size={20}
                         className={allMealChecked ? 'text-zinc-600' : 'text-zinc-400'}
                       />
                     </div>
 
                     <div className="flex-1">
-                      <h3 className={`font-medium text-sm lg:text-base ${allMealChecked ? 'text-zinc-500 line-through' : ''}`}>
+                      <h3 className={`font-medium text-[17px] ${allMealChecked ? 'text-zinc-500 line-through' : ''}`}>
                         {meal.name}
                       </h3>
-                      <p className="text-xs text-zinc-500">{meal.time}</p>
+                      <p className="text-[13px] text-zinc-500">{meal.time}</p>
                     </div>
-                    <span className="text-xs lg:text-sm text-zinc-500">
+                    <span className="text-[13px] text-zinc-500">
                       {mealCheckedCount}/{meal.items.length}
                     </span>
                   </div>
@@ -1042,71 +1044,77 @@ function MealItemRow({
   const hasAlternativeSelected = override?.alternativeId !== undefined;
 
   return (
-    <div className={`rounded-lg transition-colors ${checked ? 'bg-emerald-500/5' : 'bg-zinc-800/50 hover:bg-zinc-800'}`}>
-      <div className="flex items-center gap-3 p-3">
+    <div className={`rounded-xl transition-colors ${checked ? 'bg-emerald-500/5' : 'bg-zinc-800/50 hover:bg-zinc-800'}`}>
+      {/* Apple HIG: 44pt min row height, 16pt padding */}
+      <div className="flex items-center gap-4 p-4 min-h-[44px]">
+        {/* Apple HIG: 24pt checkbox with 44pt touch target */}
         <button
           onClick={onToggle}
-          className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
+          className={`w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
             checked
               ? 'bg-emerald-500 border-emerald-500 text-white'
-              : 'bg-transparent border-zinc-600 hover:border-zinc-500'
+              : 'bg-transparent border-zinc-500 hover:border-zinc-400'
           }`}
         >
-          {checked && <Check size={12} strokeWidth={2.5} />}
+          {checked && <Check size={16} strokeWidth={2.5} />}
         </button>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             {hasAlternatives ? (
               <>
-                <span className={`text-sm ${checked ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
+                {/* Apple HIG: 17pt primary text */}
+                <span className={`text-[17px] ${checked ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
                   {item.groupName || 'Optionen'}
                 </span>
-                <span className="text-xs text-zinc-500">
+                {/* Apple HIG: 15pt secondary text */}
+                <span className="text-[15px] text-zinc-500">
                   → {effectiveQuantity !== 1 && `${effectiveQuantity}${effectiveItem.unit === 'g' || effectiveItem.unit === 'ml' ? `${effectiveItem.unit} ` : '× '}`}{effectiveItem.name}
                 </span>
               </>
             ) : (
-              <span className={`text-sm ${checked ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
+              <span className={`text-[17px] ${checked ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
                 {effectiveQuantity !== 1 && `${effectiveQuantity}${effectiveItem.unit === 'g' || effectiveItem.unit === 'ml' ? `${effectiveItem.unit} ` : '× '}`}{effectiveItem.name}
               </span>
             )}
-            {hasQuantityOverride && <span className="text-orange-400 ml-1 text-xs">(angepasst)</span>}
+            {/* Apple HIG: 13pt caption */}
+            {hasQuantityOverride && <span className="text-orange-400 ml-1 text-[13px]">(angepasst)</span>}
             {hasAlternatives && (
-              <button onClick={onExpand} className="text-zinc-600 hover:text-zinc-400">
-                <ChevronDown size={14} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+              <button onClick={onExpand} className="p-1 -m-1 text-zinc-600 hover:text-zinc-400">
+                <ChevronDown size={16} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
               </button>
             )}
           </div>
-          <div className="flex gap-3 mt-1 text-xs text-zinc-500">
+          {/* Apple HIG: 13pt caption */}
+          <div className="flex gap-3 mt-1 text-[13px] text-zinc-500">
             <span>{totals.calories} kcal</span>
             <span>{totals.protein}g P</span>
           </div>
         </div>
 
-        {/* Override button - subtle */}
+        {/* Apple HIG: 44pt touch target */}
         {onOverrideClick && (
           <button
             onClick={onOverrideClick}
-            className="p-1.5 text-zinc-600 hover:text-zinc-400 transition-colors"
+            className="p-2 -m-2 text-zinc-600 hover:text-zinc-400 transition-colors"
             title="Menge anpassen"
           >
-            <MoreHorizontal size={16} />
+            <MoreHorizontal size={20} />
           </button>
         )}
       </div>
 
-      {/* Override input */}
+      {/* Override input - Apple HIG: 44pt touch targets */}
       {isEditing && (
-        <div className="px-3 pb-3 pt-1">
-          <div className="flex items-center gap-2 pl-8">
-            <span className="text-xs text-zinc-500">Menge heute:</span>
+        <div className="px-4 pb-4 pt-2">
+          <div className="flex items-center gap-3 pl-10">
+            <span className="text-[13px] text-zinc-500">Menge:</span>
             <input
               type="number"
               inputMode="decimal"
               value={editingValue}
               onChange={(e) => onEditingChange?.(e.target.value)}
-              className="w-20 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm"
+              className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-[17px] min-h-[44px]"
               placeholder={effectiveItem.quantity.toString()}
               autoFocus
               onKeyDown={(e) => {
@@ -1114,10 +1122,10 @@ function MealItemRow({
                 if (e.key === 'Escape') onOverrideClick?.();
               }}
             />
-            <span className="text-xs text-zinc-500">{effectiveItem.unit}</span>
+            <span className="text-[13px] text-zinc-500">{effectiveItem.unit}</span>
             <button
               onClick={onEditingSave}
-              className="bg-white text-black px-2 py-1 rounded text-xs font-medium"
+              className="bg-white text-black px-4 py-2 rounded-lg text-[15px] font-medium min-h-[44px]"
             >
               OK
             </button>
@@ -1125,19 +1133,21 @@ function MealItemRow({
         </div>
       )}
 
-      {/* Alternatives selection */}
+      {/* Alternatives selection - Apple HIG: 44pt rows */}
       {hasAlternatives && expanded && !isEditing && (
-        <div className="px-3 pb-3">
-          <div className="pl-8 space-y-1">
+        <div className="px-4 pb-4">
+          <div className="pl-10 space-y-1">
             <button
               onClick={() => onSelectAlternative?.(undefined)}
-              className={`w-full text-left text-xs px-2 py-1.5 rounded flex items-center gap-2 transition-colors ${
+              className={`w-full text-left text-[15px] px-3 min-h-[44px] rounded-lg flex items-center gap-3 transition-colors ${
                 !hasAlternativeSelected
                   ? 'bg-emerald-500/20 text-emerald-400'
                   : 'text-zinc-400 hover:bg-zinc-700/50'
               }`}
             >
-              <div className={`w-3 h-3 rounded-full border ${!hasAlternativeSelected ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600'}`} />
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${!hasAlternativeSelected ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600'}`}>
+                {!hasAlternativeSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+              </div>
               {item.quantity}{item.unit === 'g' || item.unit === 'ml' ? `${item.unit} ` : '× '}{item.name}
             </button>
             {item.alternatives!.map((alt) => {
@@ -1147,17 +1157,19 @@ function MealItemRow({
                 <button
                   key={alt.id}
                   onClick={() => onSelectAlternative?.(alt.id)}
-                  className={`w-full text-left text-xs px-2 py-1.5 rounded flex items-center gap-2 transition-colors ${
+                  className={`w-full text-left text-[15px] px-3 min-h-[44px] rounded-lg flex items-center gap-3 transition-colors ${
                     isSelected
                       ? 'bg-amber-500/20 text-amber-400'
                       : 'text-zinc-400 hover:bg-zinc-700/50'
                   }`}
                 >
-                  <div className={`w-3 h-3 rounded-full border ${isSelected ? 'bg-amber-500 border-amber-500' : 'border-zinc-600'}`} />
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'bg-amber-500 border-amber-500' : 'border-zinc-600'}`}>
+                    {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                  </div>
                   <span className="flex-1">
                     {alt.quantity}{alt.unit === 'g' || alt.unit === 'ml' ? `${alt.unit} ` : '× '}{alt.name}
                   </span>
-                  <span className="text-zinc-600">{altTotals.calories} kcal</span>
+                  <span className="text-[13px] text-zinc-600">{altTotals.calories} kcal</span>
                 </button>
               );
             })}

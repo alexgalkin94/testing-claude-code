@@ -201,28 +201,30 @@ export default function ShoppingPage() {
         <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-4">
           Einkaufen für...
         </h2>
-        <div className="space-y-3">
+        {/* Apple HIG: 44pt min row height */}
+        <div className="space-y-1">
           {plans.map(plan => {
             const days = planDays[plan.id] || 0;
             return (
-              <div key={plan.id} className="flex items-center justify-between">
-                <span className="font-medium truncate flex-1 mr-4">{plan.name}</span>
-                <div className="flex items-center gap-2">
+              <div key={plan.id} className="flex items-center justify-between min-h-[44px] py-2">
+                <span className="text-[17px] font-medium truncate flex-1 mr-4">{plan.name}</span>
+                <div className="flex items-center gap-1">
+                  {/* Apple HIG: 44pt touch target */}
                   <button
                     onClick={() => setShoppingPlanDays(plan.id, Math.max(0, days - 1))}
-                    className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
+                    className="w-11 h-11 rounded-xl bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center active:scale-95 transition-transform"
                     disabled={days === 0}
                   >
-                    <Minus size={14} className={days === 0 ? 'text-zinc-600' : ''} />
+                    <Minus size={18} className={days === 0 ? 'text-zinc-600' : ''} />
                   </button>
-                  <span className="w-12 text-center font-mono">
+                  <span className="w-12 text-center text-[17px] font-mono">
                     {days > 0 ? `${days}×` : '–'}
                   </span>
                   <button
                     onClick={() => setShoppingPlanDays(plan.id, Math.min(14, days + 1))}
-                    className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
+                    className="w-11 h-11 rounded-xl bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center active:scale-95 transition-transform"
                   >
-                    <Plus size={14} />
+                    <Plus size={18} />
                   </button>
                 </div>
               </div>
@@ -257,32 +259,32 @@ export default function ShoppingPage() {
           </button>
 
           {showAtHome && (
-            <div className="mt-4 space-y-2">
-              <p className="text-xs text-zinc-500 mb-3">
+            <div className="mt-4 space-y-1">
+              <p className="text-[13px] text-zinc-500 mb-3">
                 Gib an was du schon hast – wird von der Einkaufsliste abgezogen
               </p>
               {aggregatedItems.filter(item => !item.hasAlternatives).map(item => {
                 const homeQty = atHome[item.id] || 0;
                 const step = item.unit === 'g' || item.unit === 'ml' ? 50 : 1;
                 return (
-                  <div key={item.id} className="flex items-center justify-between py-2">
-                    <span className="text-sm text-zinc-300 truncate flex-1 mr-4">{item.name}</span>
-                    <div className="flex items-center gap-2">
+                  <div key={item.id} className="flex items-center justify-between min-h-[44px] py-2">
+                    <span className="text-[15px] text-zinc-300 truncate flex-1 mr-4">{item.name}</span>
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={() => setShoppingAtHome(item.id, Math.max(0, homeQty - step))}
-                        className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
+                        className="w-10 h-10 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center active:scale-95 transition-transform"
                         disabled={homeQty === 0}
                       >
-                        <Minus size={12} className={homeQty === 0 ? 'text-zinc-600' : ''} />
+                        <Minus size={16} className={homeQty === 0 ? 'text-zinc-600' : ''} />
                       </button>
-                      <span className="w-16 text-center text-sm font-mono">
+                      <span className="w-16 text-center text-[15px] font-mono">
                         {homeQty > 0 ? formatQuantity(homeQty, item.unit) : '–'}
                       </span>
                       <button
                         onClick={() => setShoppingAtHome(item.id, homeQty + step)}
-                        className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
+                        className="w-10 h-10 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center active:scale-95 transition-transform"
                       >
-                        <Plus size={12} />
+                        <Plus size={16} />
                       </button>
                     </div>
                   </div>
@@ -313,6 +315,7 @@ export default function ShoppingPage() {
           <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-4">
             Einkaufsliste ({shoppingList.length} Items)
           </h2>
+          {/* Apple HIG: 44pt min row height, 24pt checkbox */}
           <div className="space-y-1">
             {shoppingList.map(item => {
               const isChecked = checkedItems.has(item.id);
@@ -320,22 +323,22 @@ export default function ShoppingPage() {
                 <div
                   key={item.id}
                   onClick={() => toggleShoppingItem(item.id)}
-                  className={`flex items-start gap-3 p-3 -mx-1 rounded-lg cursor-pointer transition-all ${
+                  className={`flex items-start gap-4 p-4 -mx-1 rounded-xl cursor-pointer transition-all min-h-[44px] ${
                     isChecked ? 'bg-emerald-500/5' : 'hover:bg-zinc-800/50'
                   }`}
                 >
-                  <div className={`w-5 h-5 mt-0.5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                    isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-700'
+                  <div className={`w-6 h-6 mt-0.5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                    isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600'
                   }`}>
-                    {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+                    {isChecked && <Check size={16} className="text-white" strokeWidth={2.5} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className={`font-medium ${isChecked ? 'line-through text-zinc-500' : ''}`}>
+                      <span className={`text-[17px] font-medium ${isChecked ? 'line-through text-zinc-500' : ''}`}>
                         {item.name}
                       </span>
                       {!item.hasAlternatives && (
-                        <span className={`font-mono text-sm flex-shrink-0 ${
+                        <span className={`font-mono text-[15px] flex-shrink-0 ${
                           isChecked ? 'text-zinc-600' : 'text-emerald-500'
                         }`}>
                           {formatQuantity(item.needed, item.unit)}
@@ -344,7 +347,7 @@ export default function ShoppingPage() {
                     </div>
 
                     {item.hasAlternatives && item.alternatives.length > 0 && !isChecked ? (
-                      <p className="text-sm text-zinc-400 mt-1">
+                      <p className="text-[15px] text-zinc-400 mt-1">
                         {item.alternatives.map((alt, idx) => (
                           <span key={alt.name}>
                             {idx > 0 && <span className="text-zinc-600"> oder </span>}
@@ -354,17 +357,17 @@ export default function ShoppingPage() {
                         ))}
                       </p>
                     ) : item.hasAlternatives && isChecked ? (
-                      <p className="text-xs text-zinc-600">
+                      <p className="text-[13px] text-zinc-600">
                         {item.alternatives.map(a => a.name).join(' / ')}
                       </p>
                     ) : (
                       <>
-                        <p className={`text-xs ${isChecked ? 'text-zinc-600' : 'text-zinc-500'}`}>
+                        <p className={`text-[13px] ${isChecked ? 'text-zinc-600' : 'text-zinc-500'}`}>
                           {formatQuantity(item.needed, item.unit).replace('×', ' Stück')} benötigt
                           {item.homeQty > 0 && ` (${formatQuantity(item.homeQty, item.unit)} zuhause)`}
                         </p>
                         {!isChecked && item.sources.length > 0 && (
-                          <p className="text-xs text-zinc-600 mt-1">
+                          <p className="text-[13px] text-zinc-600 mt-1">
                             {item.sources.map(s =>
                               `${formatQuantity(s.perDay, s.unit)}/Tag ${s.planName}`
                             ).join(' · ')}
