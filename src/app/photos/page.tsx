@@ -420,12 +420,12 @@ export default function PhotosPage() {
       const response = await fetch('/api/photos', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: photo.url }),
+        body: JSON.stringify({ pathname: photo.pathname }),
       });
 
       if (response.ok) {
         // Remove photo from state instead of refetching all photos
-        setPhotos(prev => prev.filter(p => p.url !== photo.url));
+        setPhotos(prev => prev.filter(p => p.pathname !== photo.pathname));
         setShowViewer(null);
       }
     } catch (error) {

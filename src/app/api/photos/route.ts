@@ -1,8 +1,8 @@
-import { put, list, del } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { randomUUID } from 'crypto';
+import { listPhotos, uploadPhoto, deletePhoto } from '@/lib/r2';
 
 async function getSession() {
   return await auth.api.getSession({
@@ -17,25 +17,15 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const userId = session.user.id;
-  const photosPrefix = `users/${userId}/photos/`;
-
   try {
-    const { blobs } = await list({ prefix: photosPrefix });
+    const photos = await listPhotos(session.user.id);
 
-    const photos = blobs.map(blob => {
-      const filename = blob.pathname.split('/').pop() || '';
-      const datePart = filename.split('_')[0];
-
-      return {
-        url: blob.url,
-        pathname: blob.pathname,
-        uploadedAt: blob.uploadedAt,
-        date: datePart || '',
-      };
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    return NextResponse.json(photos);
+    return NextResponse.json(photos.map(p => ({
+      url: p.url,
+      pathname: p.key,
+      uploadedAt: p.uploadedAt,
+      date: p.date,
+    })));
   } catch (error) {
     console.error('Photos GET error:', error);
     return NextResponse.json({ error: 'Failed to fetch photos' }, { status: 500 });
@@ -49,9 +39,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const userId = session.user.id;
-  const photosPrefix = `users/${userId}/photos/`;
-
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -61,19 +48,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // UUID for unguessable filename
     const uuid = randomUUID();
     const ext = file.name.split('.').pop() || 'jpg';
-    const filename = `${photosPrefix}${date}_${uuid}.${ext}`;
+    const filename = `${date}_${uuid}.${ext}`;
 
-    const blob = await put(filename, file, {
-      access: 'public',
-      addRandomSuffix: false,
-    });
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const result = await uploadPhoto(session.user.id, buffer, filename, file.type);
 
     return NextResponse.json({
       success: true,
-      url: blob.url,
+      url: result.url,
+      pathname: result.key,
       date,
     });
   } catch (error) {
@@ -92,18 +77,18 @@ export async function DELETE(request: Request) {
   const userId = session.user.id;
 
   try {
-    const { url } = await request.json();
+    const { pathname } = await request.json();
 
-    if (!url) {
-      return NextResponse.json({ error: 'No URL provided' }, { status: 400 });
+    if (!pathname) {
+      return NextResponse.json({ error: 'No pathname provided' }, { status: 400 });
     }
 
-    // Check that the URL belongs to this user
-    if (!url.includes(`users/${userId}`)) {
+    // Security check - ensure key belongs to this user
+    if (!pathname.includes(`users/${userId}`)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    await del(url);
+    await deletePhoto(pathname);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Photos DELETE error:', error);
