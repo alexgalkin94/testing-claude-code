@@ -163,7 +163,7 @@ export default function WeightPage() {
       weightsNeeded,
       weeklyTrend,
     };
-  }, [data.profile, data.weights, data.extraCalories, getChecklistItems, getDayPlanId, getDaySnapshot]);
+  }, [data.profile, data.weights, data.extraCalories, data.checklist, data.daySnapshots, data.dayPlanIds, getChecklistItems, getDayPlanId, getDaySnapshot]);
 
   const handleSubmit = () => {
     if (!newWeight) return;

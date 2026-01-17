@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Check, Minus, Plus, RotateCcw, ChevronDown, ChevronUp, Home } from 'lucide-react';
 import Card from '@/components/Card';
 import { useData } from '@/lib/data-store';
-import { MealItem, getItemTotals } from '@/lib/mealPlan';
-
-const STORAGE_KEY = 'shopping-list-state';
+import { getItemTotals } from '@/lib/mealPlan';
+import { useState } from 'react';
 
 interface AlternativeOption {
   name: string;
@@ -15,17 +14,15 @@ interface AlternativeOption {
 }
 
 interface AggregatedItem {
-  id: string; // unique key for the item
+  id: string;
   name: string;
   totalQuantity: number;
   unit: string;
   sources: { planName: string; totalQty: number; perDay: number; unit: string }[];
-  // Items with alternatives (e.g., Beilage: Kartoffeln ODER Reis)
   hasAlternatives: boolean;
   alternatives: AlternativeOption[];
 }
 
-// Items to exclude from shopping (supplements, etc.)
 const EXCLUDED_ITEMS = ['omega-3', 'omega3', 'supplement', 'vitamin', 'algenöl'];
 
 function formatQuantity(qty: number, unit: string): string {
@@ -42,77 +39,33 @@ function formatQuantity(qty: number, unit: string): string {
 }
 
 export default function ShoppingPage() {
-  const { data } = useData();
+  const {
+    data,
+    setShoppingPlanDays,
+    setShoppingAtHome,
+    toggleShoppingItem,
+    resetShopping,
+  } = useData();
+
   const plans = Object.values(data.mealPlans);
+  const shopping = data.shopping || { planDays: {}, atHome: {}, checkedItems: [] };
+  const planDays = shopping.planDays || {};
+  const atHome = shopping.atHome || {};
+  const checkedItems = new Set(shopping.checkedItems || []);
 
-  // Load saved state from localStorage
-  const [planDays, setPlanDays] = useState<Record<string, number>>({});
-  const [atHome, setAtHome] = useState<Record<string, number>>({});
   const [showAtHome, setShowAtHome] = useState(false);
-  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  // Load from localStorage on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const state = JSON.parse(saved);
-        if (state.planDays) setPlanDays(state.planDays);
-        if (state.atHome) setAtHome(state.atHome);
-        if (state.checkedItems) setCheckedItems(new Set(state.checkedItems));
-      }
-    } catch (e) {
-      // Ignore errors
-    }
-    setIsLoaded(true);
-  }, []);
 
   // Initialize planDays for any new plans
   useEffect(() => {
-    if (!isLoaded) return;
-    setPlanDays(prev => {
-      const next = { ...prev };
-      for (const p of plans) {
-        if (!(p.id in next)) next[p.id] = 0;
+    for (const p of plans) {
+      if (!(p.id in planDays)) {
+        setShoppingPlanDays(p.id, 0);
       }
-      return next;
-    });
-  }, [plans, isLoaded]);
-
-  // Save to localStorage whenever state changes
-  useEffect(() => {
-    if (!isLoaded) return;
-    const state = {
-      planDays,
-      atHome,
-      checkedItems: Array.from(checkedItems),
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [planDays, atHome, checkedItems, isLoaded]);
-
-  const toggleItem = (id: string) => {
-    setCheckedItems(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const resetList = () => {
-    setCheckedItems(new Set());
-    setAtHome({});
-    setPlanDays(prev => {
-      const next = { ...prev };
-      for (const key of Object.keys(next)) next[key] = 0;
-      return next;
-    });
-  };
+    }
+  }, [plans.length]);
 
   const totalDays = Object.values(planDays).reduce((a, b) => a + b, 0);
 
-  // Aggregate items from all plans
   const aggregatedItems = useMemo(() => {
     const itemMap = new Map<string, AggregatedItem>();
 
@@ -123,30 +76,21 @@ export default function ShoppingPage() {
       for (const meal of plan.meals) {
         for (const item of meal.items) {
           const nameLower = item.name.toLowerCase();
-
-          // Skip excluded items
           if (EXCLUDED_ITEMS.some(ex => nameLower.includes(ex))) continue;
 
-          // Check if this item has alternatives
           const hasAlts = item.alternatives && item.alternatives.length > 0;
-
-          // Use groupName for items with alternatives, otherwise lowercase name
-          // This ensures same items are aggregated even across plans
           const key = hasAlts
             ? (item.groupName || item.name).toLowerCase()
             : nameLower;
           const existing = itemMap.get(key);
 
-          // Build alternatives list with scaled quantities
           const alternatives: AlternativeOption[] = [];
           if (hasAlts && item.alternatives) {
-            // Add main item as first option
             alternatives.push({
               name: item.name,
               quantity: item.quantity * days,
               unit: item.unit,
             });
-            // Add all alternatives
             for (const alt of item.alternatives) {
               alternatives.push({
                 name: alt.name,
@@ -158,7 +102,6 @@ export default function ShoppingPage() {
 
           if (existing) {
             existing.totalQuantity += item.quantity * days;
-            // Check if this plan is already in sources
             const existingSource = existing.sources.find(s => s.planName === plan.name);
             if (existingSource) {
               existingSource.totalQty += item.quantity * days;
@@ -171,22 +114,20 @@ export default function ShoppingPage() {
                 unit: item.unit,
               });
             }
-            // Scale up alternatives if they exist
             if (hasAlts && existing.alternatives.length > 0) {
-              for (let i = 0; i < alternatives.length; i++) {
-                const existingAlt = existing.alternatives.find(a => a.name.toLowerCase() === alternatives[i].name.toLowerCase());
+              for (const alt of alternatives) {
+                const existingAlt = existing.alternatives.find(
+                  a => a.name.toLowerCase() === alt.name.toLowerCase()
+                );
                 if (existingAlt) {
-                  existingAlt.quantity += alternatives[i].quantity;
+                  existingAlt.quantity += alt.quantity;
                 } else {
-                  // Add new alternative that wasn't in the first plan
-                  existing.alternatives.push(alternatives[i]);
+                  existing.alternatives.push(alt);
                 }
               }
             }
           } else {
-            // Use groupName if available, otherwise item name
             const displayName = item.groupName || item.name;
-
             itemMap.set(key, {
               id: key,
               name: displayName,
@@ -206,7 +147,6 @@ export default function ShoppingPage() {
       }
     }
 
-    // Sort: items with alternatives first (need decision), then alphabetically
     return Array.from(itemMap.values()).sort((a, b) => {
       if (a.hasAlternatives && !b.hasAlternatives) return -1;
       if (!a.hasAlternatives && b.hasAlternatives) return 1;
@@ -214,27 +154,19 @@ export default function ShoppingPage() {
     });
   }, [plans, planDays]);
 
-  // Calculate final shopping list (minus what's at home)
   const shoppingList = useMemo(() => {
     return aggregatedItems.map(item => {
       const homeQty = atHome[item.id] || 0;
       const needed = Math.max(0, item.totalQuantity - homeQty);
-
-      return {
-        ...item,
-        needed,
-        homeQty,
-      };
+      return { ...item, needed, homeQty };
     }).filter(item => item.needed > 0);
   }, [aggregatedItems, atHome]);
 
-  // Total calories
   const totalCalories = useMemo(() => {
     let total = 0;
     for (const plan of plans) {
       const days = planDays[plan.id] || 0;
       if (days === 0) continue;
-
       for (const meal of plan.meals) {
         for (const item of meal.items) {
           const itemTotal = getItemTotals(item);
@@ -249,20 +181,22 @@ export default function ShoppingPage() {
 
   return (
     <div className="p-4 pb-24 lg:p-8 lg:pb-8 lg:max-w-2xl">
-      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <p className="text-zinc-500 text-sm">Dynamische</p>
           <h1 className="text-xl font-semibold tracking-tight">Einkaufsliste</h1>
         </div>
         {(totalDays > 0 || checkedItems.size > 0 || Object.values(atHome).some(v => v > 0)) && (
-          <button onClick={resetList} className="p-2 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-800" title="Liste zurücksetzen">
+          <button
+            onClick={resetShopping}
+            className="p-2 text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-800"
+            title="Liste zurücksetzen"
+          >
             <RotateCcw size={20} />
           </button>
         )}
       </div>
 
-      {/* Plan Selector */}
       <Card className="mb-4">
         <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-4">
           Einkaufen für...
@@ -275,7 +209,7 @@ export default function ShoppingPage() {
                 <span className="font-medium truncate flex-1 mr-4">{plan.name}</span>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setPlanDays(p => ({ ...p, [plan.id]: Math.max(0, (p[plan.id] || 0) - 1) }))}
+                    onClick={() => setShoppingPlanDays(plan.id, Math.max(0, days - 1))}
                     className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
                     disabled={days === 0}
                   >
@@ -285,7 +219,7 @@ export default function ShoppingPage() {
                     {days > 0 ? `${days}×` : '–'}
                   </span>
                   <button
-                    onClick={() => setPlanDays(p => ({ ...p, [plan.id]: Math.min(14, (p[plan.id] || 0) + 1) }))}
+                    onClick={() => setShoppingPlanDays(plan.id, Math.min(14, days + 1))}
                     className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
                   >
                     <Plus size={14} />
@@ -304,7 +238,6 @@ export default function ShoppingPage() {
         )}
       </Card>
 
-      {/* At Home Section */}
       {aggregatedItems.length > 0 && (
         <Card className="mb-4">
           <button
@@ -336,10 +269,7 @@ export default function ShoppingPage() {
                     <span className="text-sm text-zinc-300 truncate flex-1 mr-4">{item.name}</span>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setAtHome(h => ({
-                          ...h,
-                          [item.id]: Math.max(0, homeQty - step)
-                        }))}
+                        onClick={() => setShoppingAtHome(item.id, Math.max(0, homeQty - step))}
                         className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
                         disabled={homeQty === 0}
                       >
@@ -349,10 +279,7 @@ export default function ShoppingPage() {
                         {homeQty > 0 ? formatQuantity(homeQty, item.unit) : '–'}
                       </span>
                       <button
-                        onClick={() => setAtHome(h => ({
-                          ...h,
-                          [item.id]: homeQty + step
-                        }))}
+                        onClick={() => setShoppingAtHome(item.id, homeQty + step)}
                         className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
                       >
                         <Plus size={12} />
@@ -366,7 +293,6 @@ export default function ShoppingPage() {
         </Card>
       )}
 
-      {/* Progress */}
       {shoppingList.length > 0 && checkedCount > 0 && (
         <div className="mb-4">
           <div className="flex justify-between text-sm mb-2">
@@ -382,7 +308,6 @@ export default function ShoppingPage() {
         </div>
       )}
 
-      {/* Shopping List */}
       {shoppingList.length > 0 ? (
         <Card>
           <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-4">
@@ -394,7 +319,7 @@ export default function ShoppingPage() {
               return (
                 <div
                   key={item.id}
-                  onClick={() => toggleItem(item.id)}
+                  onClick={() => toggleShoppingItem(item.id)}
                   className={`flex items-start gap-3 p-3 -mx-1 rounded-lg cursor-pointer transition-all ${
                     isChecked ? 'bg-emerald-500/5' : 'hover:bg-zinc-800/50'
                   }`}
@@ -418,7 +343,6 @@ export default function ShoppingPage() {
                       )}
                     </div>
 
-                    {/* Show alternatives if available */}
                     {item.hasAlternatives && item.alternatives.length > 0 && !isChecked ? (
                       <p className="text-sm text-zinc-400 mt-1">
                         {item.alternatives.map((alt, idx) => (
